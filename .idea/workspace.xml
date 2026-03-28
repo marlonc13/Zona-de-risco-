@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ChangeListManager">
+    <list default="true" id="f9c84c86-1c77-4d66-93bf-f07f4f4734b1" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/area-de-risco/.gitignore" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/area-de-risco/.vscode/extensions.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/area-de-risco/.vscode/settings.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/area-de-risco/README.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/area-de-risco/app.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/area-de-risco/app/(tabs)/_layout.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/area-de-risco/app/(tabs)/explore.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/area-de-risco/app/(tabs)/index.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/area-de-risco/app/_layout.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/area-de-risco/app/modal.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/area-de-risco/assets/images/android-icon-background.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/area-de-risco/assets/images/android-icon-foreground.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/area-de-risco/assets/images/android-icon-monochrome.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/area-de-risco/assets/images/favicon.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/area-de-risco/assets/images/icon.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/area-de-risco/assets/images/partial-react-logo.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/area-de-risco/assets/images/react-logo.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/area-de-risco/assets/images/react-logo@2x.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/area-de-risco/assets/images/react-logo@3x.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/area-de-risco/assets/images/splash-icon.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/area-de-risco/components/external-link.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/area-de-risco/components/haptic-tab.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/area-de-risco/components/hello-wave.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/area-de-risco/components/parallax-scroll-view.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/area-de-risco/components/themed-text.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/area-de-risco/components/themed-view.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/area-de-risco/components/ui/collapsible.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/area-de-risco/components/ui/icon-symbol.ios.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/area-de-risco/components/ui/icon-symbol.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/area-de-risco/constants/theme.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/area-de-risco/eslint.config.js" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/area-de-risco/hooks/use-color-scheme.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/area-de-risco/hooks/use-color-scheme.web.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/area-de-risco/hooks/use-theme-color.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/area-de-risco/package-lock.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/area-de-risco/package.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/area-de-risco/scripts/reset-project.js" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/area-de-risco/tsconfig.json" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$/area-de-risco" />
+  </component>
+  <component name="ProjectColorInfo">{
+  &quot;customColor&quot;: &quot;&quot;,
+  &quot;associatedIndex&quot;: 2
+}</component>
+  <component name="ProjectId" id="3BVMHW0QvFRATVBmvwzKTE9niKu" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "git-widget-placeholder": "master",
+    "kotlin-language-version-configured": "true",
+    "settings.editor.selected.configurable": "preferences.pluginManager"
+  }
+}]]></component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="f9c84c86-1c77-4d66-93bf-f07f4f4734b1" name="Changes" comment="" />
+      <created>1774569701708</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1774569701708</updated>
+    </task>
+    <servers />
+  </component>
+</project>
