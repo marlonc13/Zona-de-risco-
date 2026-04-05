@@ -1,8 +1,8 @@
 import { Link } from 'expo-router';
 import { StyleSheet } from 'react-native';
 
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
+import { ThemedText } from '../components/themed-text';
+import { ThemedView } from '../components/themed-view';
 
 export default function ModalScreen() {
   return (
@@ -17,13 +17,13 @@ export default function ModalScreen() {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    flex: 1,               // precisava do número
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 20,
+    padding: 16,           // precisava do número
   },
   link: {
-    marginTop: 15,
-    paddingVertical: 15,
+    marginTop: 16,         // precisava do número
+    paddingVertical: 8,    // precisava do número
   },
 });
