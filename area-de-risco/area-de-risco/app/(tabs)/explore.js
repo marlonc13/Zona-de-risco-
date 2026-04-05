@@ -1,4 +1,4 @@
-import { CameraView, useCameraPermissions } from 'expo-camera';
+import { CameraView, useCameraPermissions } from 'expo-camera'; 
 import { useRef } from 'react';
 import { View, Button, Text } from 'react-native';
 
@@ -12,7 +12,7 @@ export default function Explore() {
 
   if (!permission.granted) {
     return (
-      <View style={{flex:1, justifyContent:'center', alignItems:'center'}}>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
         <Text>Permissão necessária</Text>
         <Button title="Permitir câmera" onPress={requestPermission} />
       </View>
@@ -28,8 +28,8 @@ export default function Explore() {
   };
 
   return (
-    <View style={{flex:1}}>
-      <CameraView style={{flex:1}} ref={cameraRef} />
+    <View style={{ flex: 1 }}>
+      <CameraView style={{ flex: 1 }} ref={cameraRef} />
       <Button title="Tirar Foto" onPress={tirarFoto} />
     </View>
   );
