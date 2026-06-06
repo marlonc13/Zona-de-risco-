@@ -1,0 +1,24 @@
+Melhoria adicionada nesta versão:
+
+1. Agora existem 3 opções:
+   - Entrar com Google
+   - Criar conta / entrar com e-mail
+   - Continuar como visitante
+
+2. Visitante:
+   - consegue ver o mapa e os alertas
+   - não consegue criar marcações
+
+3. Login com e-mail/senha:
+   - permite criar conta na hora
+   - permite entrar com conta existente
+   - depois do login, pede biometria
+   - se o celular não tiver biometria cadastrada, o app avisa e deixa entrar
+
+4. Para funcionar no Firebase:
+   - Vá em Firebase Console
+   - Authentication
+   - Sign-in method
+   - Ative Email/Password
+
+5. O login Google continua dependendo dos Client IDs reais.
