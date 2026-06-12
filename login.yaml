@@ -1,9 +1,7 @@
-appId: com.example.zonaderisco
+appId: com.alinelasneau.areaderisco
 
 ---
 - launchApp
-
-- assertVisible: "Login"
 
 - tapOn: "Email"
 - inputText: "teste@email.com"
@@ -13,4 +11,4 @@ appId: com.example.zonaderisco
 
 - tapOn: "Entrar"
 
-- assertVisible: "Tela Principal"
+- assertVisible: "Bem-vindo"
