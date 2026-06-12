@@ -1,0 +1,16 @@
+appId: com.example.zonaderisco
+
+---
+- launchApp
+
+- assertVisible: "Login"
+
+- tapOn: "Email"
+- inputText: "teste@email.com"
+
+- tapOn: "Senha"
+- inputText: "123456"
+
+- tapOn: "Entrar"
+
+- assertVisible: "Tela Principal"
