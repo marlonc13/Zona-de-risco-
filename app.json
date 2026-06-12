@@ -18,10 +18,11 @@
     "android": {
       "package": "com.alinelasneau.areaderisco",
       "permissions": [
-        "ACCESS_COARSE_LOCATION",
-        "READ_MEDIA_IMAGES",
-        "ACCESS_FINE_LOCATION",
-        "CAMERA"
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
       ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/icon.png",
@@ -59,7 +60,7 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "13365a1d-4cb2-4ce7-974d-30e90ebcb01f"
+        "projectId": "ed00a47a-f97f-4d84-a5d2-9d4f5785d926"
       }
     }
   }
