@@ -1,36 +1,17 @@
-import { CameraView, useCameraPermissions } from 'expo-camera'; 
-import { useRef } from 'react';
-import { View, Button, Text } from 'react-native';
+import React from 'react';
+import { View, Text, StyleSheet } from 'react-native';
 
 export default function Explore() {
-  const [permission, requestPermission] = useCameraPermissions();
-  const cameraRef = useRef(null);
-
-  if (!permission) {
-    return <Text>Carregando...</Text>;
-  }
-
-  if (!permission.granted) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <Text>Permissão necessária</Text>
-        <Button title="Permitir câmera" onPress={requestPermission} />
-      </View>
-    );
-  }
-
-  const tirarFoto = async () => {
-    if (cameraRef.current) {
-      const foto = await cameraRef.current.takePictureAsync();
-      alert("Foto tirada!");
-      console.log(foto);
-    }
-  };
-
   return (
-    <View style={{ flex: 1 }}>
-      <CameraView style={{ flex: 1 }} ref={cameraRef} />
-      <Button title="Tirar Foto" onPress={tirarFoto} />
+    <View style={styles.container}>
+      <Text style={styles.title}>Alertas</Text>
+      <Text style={styles.text}>Use a aba Mapa para ver e criar alertas. A leitura de QR Code foi removida.</Text>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, backgroundColor: '#fff' },
+  title: { fontSize: 24, fontWeight: '900', color: '#202124', marginBottom: 8 },
+  text: { fontSize: 16, color: '#5f6368', textAlign: 'center', lineHeight: 22 },
+});

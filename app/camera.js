@@ -1,9 +1,7 @@
-import { Text, View } from 'react-native';
+import { Redirect } from 'expo-router';
 
+// A tela de QR Code foi removida.
+// Agora o app abre direto no mapa; login só é pedido quando a pessoa tentar criar alerta.
 export default function CameraScreen() {
-  return (
-    <View style={{flex:1, justifyContent:'center', alignItems:'center'}}>
-      <Text>CAMERA OK</Text>
-    </View>
-  );
+  return <Redirect href="/mapa" />;
 }
