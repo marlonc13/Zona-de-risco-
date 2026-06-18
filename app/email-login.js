@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, TouchableOpacity, ImageBackground, Alert, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TextInput, StyleSheet, TouchableOpacity, ImageBackground, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, signOut } from 'firebase/auth';
-import { auth } from '../services/firebaseConfig';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, signOut, sendPasswordResetEmail } from 'firebase/auth';
+
+// TENTATIVA 1: Importação padrão
+import { auth } from '../services/firebaseConfig'; 
 import { authenticateWithBiometrics } from '../services/biometricAuth';
 
 export default function EmailLogin() {
@@ -13,6 +15,15 @@ export default function EmailLogin() {
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [carregando, setCarregando] = useState(false);
+
+  // MONITOR DETETIVE: Printa no terminal do VS Code exatamente a chave que está ativa
+  useEffect(() => {
+    console.log("====================================");
+    console.log("DEBUG INTERNO DE SEGURANÇA:");
+    console.log("API Key ativa no Auth:", auth?.config?.apiKey || "NENHUMA CHAVE ENCONTRADA");
+    console.log("Project ID ativo:", auth?.config?.authDomain || "SEM DOMÍNIO");
+    console.log("====================================");
+  }, []);
 
   const entrarNoApp = async (user) => {
     await AsyncStorage.setItem('userToken', await user.getIdToken());
@@ -35,6 +46,29 @@ export default function EmailLogin() {
 
     await signOut(auth);
     Alert.alert('Biometria necessária', 'Para entrar, confirme sua biometria.');
+  };
+
+  const handleEsqueciSenha = async () => {
+    const emailLimpo = email.trim().toLowerCase();
+
+    if (!emailLimpo) {
+      Alert.alert('E-mail necessário', 'Por favor, digite seu e-mail no campo correspondente antes de clicar em recuperar senha.');
+      return;
+    }
+
+    try {
+      setCarregando(true);
+      await sendPasswordResetEmail(auth, emailLimpo);
+      Alert.alert('Sucesso', `E-mail de redefinição enviado para:\n${emailLimpo}\n\nVerifique sua caixa de entrada e spam.`);
+    } catch (error) {
+      console.error(error);
+      let msg = 'Não foi possível enviar o e-mail de recuperação.';
+      if (error.code === 'auth/user-not-found') msg = 'Nenhum usuário cadastrado com este e-mail.';
+      if (error.code === 'auth/invalid-email') msg = 'Formato de e-mail inválido.';
+      Alert.alert('Erro', msg);
+    } finally {
+      setCarregando(false);
+    }
   };
 
   const enviar = async () => {
@@ -76,7 +110,7 @@ export default function EmailLogin() {
       if (error.code === 'auth/email-already-in-use') mensagem = 'Esse e-mail já tem conta. Troque para "Entrar" em vez de criar conta.';
       if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password') mensagem = 'E-mail ou senha incorretos.';
       if (error.code === 'auth/user-not-found') mensagem = 'Conta não encontrada. Troque para "Criar conta".';
-      if (error.code === 'auth/invalid-email') mensagem = 'Digite um e-mail válido.';
+      if (error.code === 'auth/invalid-email') mensagem = 'Digite um e-mail válido.'; 
       if (error.code === 'auth/operation-not-allowed') mensagem = 'Ative o provedor E-mail/Senha no Firebase Authentication.';
 
       Alert.alert('Erro', mensagem);
@@ -88,7 +122,15 @@ export default function EmailLogin() {
   return (
     <ImageBackground source={require('../assets/images/fundoentrada.png')} style={styles.container} resizeMode="cover" blurRadius={1}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.overlay}>
-        <View style={styles.logo}><Text style={styles.logoText}>ZR</Text></View>
+        
+        <View style={styles.logo}>
+          <Image 
+            source={require('../assets/images/icon.png')} 
+            style={styles.logoImagem} 
+            resizeMode="contain"
+          />
+        </View>
+
         <Text style={styles.title}>{modoCadastro ? 'Criar conta' : 'Entrar'}</Text>
         <Text style={styles.subtitle}>Use e-mail e senha. Depois confirme a biometria para acessar.</Text>
 
@@ -126,6 +168,12 @@ export default function EmailLogin() {
           {carregando ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>{modoCadastro ? 'Criar e entrar' : 'Entrar com senha'}</Text>}
         </TouchableOpacity>
 
+        {!modoCadastro && (
+          <TouchableOpacity style={styles.esqueciBotao} onPress={handleEsqueciSenha} disabled={carregando}>
+            <Text style={styles.esqueciText}>Esqueceu sua senha?</Text>
+          </TouchableOpacity>
+        )}
+
         <TouchableOpacity style={styles.linkButton} onPress={() => setModoCadastro(!modoCadastro)} disabled={carregando}>
           <Text style={styles.linkText}>{modoCadastro ? 'Já tenho conta' : 'Não tenho conta, criar agora'}</Text>
         </TouchableOpacity>
@@ -145,14 +193,16 @@ export default function EmailLogin() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   overlay: { flex: 1, backgroundColor: 'rgba(255,255,255,0.84)', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 28 },
-  logo: { width: 90, height: 90, borderRadius: 45, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', marginBottom: 16, elevation: 8 },
-  logoText: { fontSize: 32, fontWeight: '900', color: '#1a73e8' },
+  logo: { width: 90, height: 90, borderRadius: 45, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', marginBottom: 16, elevation: 8, overflow: 'hidden' },
+  logoImagem: { width: '70%', height: '70%' },
   title: { fontSize: 28, fontWeight: '900', color: '#202124' },
   subtitle: { fontSize: 15, color: '#444', textAlign: 'center', marginTop: 8, marginBottom: 22, lineHeight: 21 },
   input: { width: '100%', backgroundColor: '#fff', paddingVertical: 14, paddingHorizontal: 14, borderRadius: 14, marginBottom: 12, borderWidth: 1, borderColor: '#dadce0', color: '#202124' },
   button: { width: '100%', backgroundColor: '#1a73e8', paddingVertical: 15, borderRadius: 15, alignItems: 'center', marginTop: 4 },
   buttonText: { color: '#fff', fontSize: 16, fontWeight: '800' },
-  linkButton: { marginTop: 15, padding: 8 },
+  esqueciBotao: { marginTop: 12, paddingVertical: 4 },
+  esqueciText: { color: '#5f6368', fontWeight: '700', fontSize: 14, textDecorationLine: 'underline' },
+  linkButton: { marginTop: 10, padding: 8 },
   linkText: { color: '#1a73e8', fontWeight: '800' },
   visitanteButton: { width: '100%', backgroundColor: '#fff', paddingVertical: 14, borderRadius: 15, alignItems: 'center', borderWidth: 1, borderColor: '#dadce0', marginTop: 8 },
   visitanteText: { color: '#1a73e8', fontWeight: '800', fontSize: 15 },

@@ -39,7 +39,9 @@ export default function Perfil() {
       Alert.alert('Permissão necessária', 'Permita acesso às fotos.');
       return;
     }
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.7, allowsEditing: true, aspect: [1, 1] });
+    const result = await ImagePicker.launchImageLibraryAsync
+    ({ mediaTypes: ImagePicker.MediaTypeOptions.Images, 
+      quality: 0.7, allowsEditing: true, aspect: [1, 1] });
     if (!result.canceled) setFoto(result.assets[0].uri);
   };
 

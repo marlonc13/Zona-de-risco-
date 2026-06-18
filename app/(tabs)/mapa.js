@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system'; 
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp } from 'firebase/firestore';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -13,9 +14,6 @@ import app from '../../services/firebaseConfig';
 const db = getFirestore(app);
 const auth = getAuth(app);
 const storage = getStorage(app);
-
-const TRINTA_MINUTOS = 30 * 60 * 1000;
-const UMA_HORA = 60 * 60 * 1000;
 
 const REGIAO_PADRAO = {
   latitude: -22.47,
@@ -33,6 +31,12 @@ const TIPOS_ALERTA = [
   { label: 'Outro', emoji: '📍', cor: '#5f6368' },
 ];
 
+const OPCOES_TEMPO = [
+  { label: '30 Minutos', valor: 30 * 60 * 1000 },
+  { label: '1 Hora', valor: 60 * 60 * 1000 },
+  { label: '2 Horas', valor: 120 * 60 * 1000 },
+];
+
 function corDoTipo(tipo) {
   return TIPOS_ALERTA.find(item => item.label === tipo)?.cor || '#d93025';
 }
@@ -41,30 +45,33 @@ function emojiDoTipo(tipo) {
   return TIPOS_ALERTA.find(item => item.label === tipo)?.emoji || '📍';
 }
 
-async function uriParaBlob(uri) {
-  const response = await fetch(uri);
-  return await response.blob();
+// SOLUÇÃO DO PROBLEMA COM FOTOS: O fetch nativo converte caminhos locais (file://) em Blobs sem travar o Android
+async function uriParaBlobAndroid(uri) {
+  try {
+    const resposta = await fetch(uri);
+    const blob = await resposta.blob();
+    return blob;
+  } catch (error) {
+    console.error("Erro ao converter URI usando fetch:", error);
+    throw error;
+  }
 }
 
-function comTimeout(promise, ms = 15000) {
+function comTimeout(promise, ms = 25000) { 
   return Promise.race([
     promise,
-    new Promise((_, reject) => setTimeout(() => reject(new Error('Tempo esgotado ao salvar. Verifique internet/Firebase.')), ms)),
+    new Promise((_, reject) => setTimeout(() => reject(new Error('Tempo esgotado. Verifique a internet.')), ms)),
   ]);
 }
-
-const TEMPO_ENTRE_ALERTAS = 2 * 60 * 1000;
-const JANELA_SPAM = 30 * 60 * 1000;
-const LIMITE_ALERTAS_JANELA = 5;
 
 export default function MapScreen() {
   const router = useRouter();
   const mapRef = useRef(null);
-  const alertasConhecidos = useRef(new Set());
 
   const [usuario, setUsuario] = useState(null);
   const [localizacao, setLocalizacao] = useState(null);
   const [regiaoInicial, setRegiaoInicial] = useState(REGIAO_PADRAO);
+  const [regiaoAtual, setRegiaoAtual] = useState(REGIAO_PADRAO);
   const [alertas, setAlertas] = useState([]);
   const [filtroAtivo, setFiltroAtivo] = useState('Todos');
   const [modalVisivel, setModalVisivel] = useState(false);
@@ -73,11 +80,7 @@ export default function MapScreen() {
   const [comentario, setComentario] = useState('');
   const [foto, setFoto] = useState(null);
   const [salvando, setSalvando] = useState(false);
-
-  const iniciais = useMemo(() => {
-    const nome = usuario?.displayName || usuario?.email || 'Visitante';
-    return nome.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
-  }, [usuario]);
+  const [tempoSelecionado, setTempoSelecionado] = useState(null); 
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, user => setUsuario(user));
@@ -87,70 +90,29 @@ export default function MapScreen() {
   useEffect(() => {
     const pegarLocalizacao = async () => {
       try {
-        const servicosAtivos = await Location.hasServicesEnabledAsync();
-        if (!servicosAtivos) {
-          Alert.alert('Localização desligada', 'Ative o GPS/localização do celular.');
-          return;
-        }
-
         const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') {
-          Alert.alert('Permissão negada', 'Você ainda consegue ver alertas, mas sua posição não aparecerá no mapa.');
-          return;
-        }
+        if (status !== 'granted') return;
 
-        const posicao = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-        const coords = {
-          latitude: posicao.coords.latitude,
-          longitude: posicao.coords.longitude,
-        };
-
+        const posicao = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        const coords = { latitude: posicao.coords.latitude, longitude: posicao.coords.longitude };
         setLocalizacao(coords);
-        const novaRegiao = { ...coords, latitudeDelta: 0.012, longitudeDelta: 0.012 };
-        setRegiaoInicial(novaRegiao);
-        mapRef.current?.animateToRegion(novaRegiao, 700);
+        setRegiaoInicial({ ...coords, latitudeDelta: 0.012, longitudeDelta: 0.012 });
       } catch (erro) {
-        console.error('Erro ao buscar localização:', erro);
+        console.error(erro);
       }
     };
-
-    pegarLocalizacao();
+     pegarLocalizacao();
   }, []);
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, 'marcacoes'), async snapshot => {
+    const unsubscribe = onSnapshot(collection(db, 'marcacoes'), snapshot => {
       const agora = Date.now();
       const dados = snapshot.docs
         .map(doc => ({ id: doc.id, ...doc.data() }))
-        .filter(item => item.expiresAt && item.expiresAt > agora)
-        .sort((a, b) => (b.createdAtMillis || 0) - (a.createdAtMillis || 0));
-
-      const idsAnteriores = alertasConhecidos.current;
-      const novos = dados.filter(item => !idsAnteriores.has(item.id));
-      dados.forEach(item => idsAnteriores.add(item.id));
+        .filter(item => item.expiresAt && item.expiresAt > agora);
       setAlertas(dados);
-
-      if (novos.length > 0 && idsAnteriores.size > novos.length && Platform.OS !== 'web') {
-        const alerta = novos[0];
-        Alert.alert(
-          `${emojiDoTipo(alerta.tipo)} Novo alerta de ${alerta.tipo || 'risco'}`,
-          alerta.comentario || 'Um usuário marcou um novo ponto no mapa.'
-        );
-      }
-    }, erro => {
-      console.error('Erro ao carregar alertas:', erro);
-      Alert.alert('Erro no Firebase', 'Não consegui carregar os alertas. Verifique internet e regras do Firestore.');
     });
-
-    const intervalo = setInterval(() => {
-      const agora = Date.now();
-      setAlertas(lista => lista.filter(item => item.expiresAt && item.expiresAt > agora));
-    }, 30000);
-
-    return () => {
-      unsubscribe();
-      clearInterval(intervalo);
-    };
+    return () => unsubscribe();
   }, []);
 
   const alertasFiltrados = useMemo(() => {
@@ -160,7 +122,7 @@ export default function MapScreen() {
 
   const exigirLogin = () => {
     if (!usuario) {
-      Alert.alert('Login necessário', 'Você pode ver os alertas sem login, mas precisa entrar com Google ou e-mail/senha para criar alertas.', [
+      Alert.alert('Login necessário', 'Você precisa entrar na sua conta para criar marcações.', [
         { text: 'Cancelar', style: 'cancel' },
         { text: 'Entrar', onPress: () => router.push('/login') },
       ]);
@@ -175,101 +137,79 @@ export default function MapScreen() {
     setComentario('');
     setFoto(null);
     setTipoSelecionado('Alagamento');
+    setTempoSelecionado(null);
     setModalVisivel(true);
+  };
+
+  const pressionouBotaoAzul = async () => {
+    if (!exigirLogin()) return;
+    
+    setComentario('');
+    setFoto(null);
+    setTipoSelecionado('Alagamento');
+    setTempoSelecionado(null);
+
+    if (localizacao) {
+      setCoordenadaSelecionada(localizacao);
+      setModalVisivel(true);
+    } else {
+      setCoordenadaSelecionada({
+        latitude: regiaoAtual.latitude,
+        longitude: regiaoAtual.longitude
+      });
+      setModalVisivel(true);
+    }
   };
 
   const tirarFoto = async () => {
     const permissao = await ImagePicker.requestCameraPermissionsAsync();
-    if (!permissao.granted) {
-      Alert.alert('Permissão necessária', 'Permita o acesso à câmera para tirar foto do alerta.');
-      return;
-    }
-
-    const result = await ImagePicker.launchCameraAsync({
-      quality: 0.6,
-      allowsEditing: true,
-      aspect: [4, 3],
-    });
-
-    if (!result.canceled) {
-      setFoto(result.assets[0].uri);
-    }
+    if (!permissao.granted) return;
+    const result = await ImagePicker.launchCameraAsync({ quality: 0.4, allowsEditing: true, aspect: [4, 3] });
+    if (!result.canceled) setFoto(result.assets[0].uri);
   };
 
   const escolherFoto = async () => {
     const permissao = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permissao.granted) {
-      Alert.alert('Permissão necessária', 'Permita acesso à galeria para anexar uma foto.');
-      return;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.6,
-      allowsEditing: true,
-      aspect: [4, 3],
-    });
-
-    if (!result.canceled) {
-      setFoto(result.assets[0].uri);
-    }
+    if (!permissao.granted) return;
+    const result = await ImagePicker.launchImageLibraryAsync({ quality: 0.4, allowsEditing: true, aspect: [4, 3] });
+    if (!result.canceled) setFoto(result.assets[0].uri);
   };
 
   const salvarMarcacao = async () => {
     if (salvando) return;
-
     const userAtual = auth.currentUser || usuario;
     const texto = comentario.trim();
 
-    if (!userAtual) {
-      Alert.alert('Login necessário', 'Visitantes podem ver alertas, mas não podem publicar. Entre com e-mail/senha para marcar no mapa.');
-      setModalVisivel(false);
-      router.push('/login');
-      return;
-    }
-
     if (!texto) {
-      Alert.alert('Comentário vazio', 'Escreva o que está acontecendo nesse local.');
+      Alert.alert('Aviso', 'Escreva uma breve descrição do problema.');
       return;
     }
 
     if (!coordenadaSelecionada) {
-      Alert.alert('Local não selecionado', 'Segure no mapa para escolher onde está o alerta.');
+      Alert.alert('Erro', 'Não foi possível detectar a localização do marcador.');
       return;
     }
 
     try {
       setSalvando(true);
-
       const agora = Date.now();
-      const historicoTexto = await AsyncStorage.getItem(`alertasHistorico:${userAtual.uid}`);
-      const historico = historicoTexto ? JSON.parse(historicoTexto) : [];
-      const recentes = historico.filter(t => agora - t < JANELA_SPAM);
-      const ultimo = recentes[recentes.length - 1];
 
-      if (ultimo && agora - ultimo < TEMPO_ENTRE_ALERTAS) {
-        const segundos = Math.ceil((TEMPO_ENTRE_ALERTAS - (agora - ultimo)) / 1000);
-        Alert.alert('Calma aí', `Para evitar spam, espere ${segundos}s antes de criar outro alerta.`);
-        setSalvando(false);
-        return;
-      }
+      let duracaoAlerta = 30 * 60 * 1000; 
 
-      if (recentes.length >= LIMITE_ALERTAS_JANELA) {
-        Alert.alert('Limite temporário', 'Para evitar spam, cada conta pode criar no máximo 5 alertas a cada 30 minutos.');
-        setSalvando(false);
-        return;
+      if (tempoSelecionado !== null) {
+        duracaoAlerta = tempoSelecionado;
+      } else {
+        duracaoAlerta = foto ? 60 * 60 * 1000 : 30 * 60 * 1000; 
       }
 
       let fotoUrl = null;
-      const criadoEm = agora;
-      const duracao = foto ? UMA_HORA : TRINTA_MINUTOS;
-
       if (foto) {
-        const blob = await uriParaBlob(foto);
-        const caminho = `alertas/${userAtual.uid}/${criadoEm}.jpg`;
-        const storageRef = ref(storage, caminho);
-        await comTimeout(uploadBytes(storageRef, blob), 20000);
-        fotoUrl = await comTimeout(getDownloadURL(storageRef), 10000);
+        const blob = await uriParaBlobAndroid(foto);
+        const storageRef = ref(storage, `alertas/${userAtual.uid}/${agora}.jpg`);
+        const metadata = { contentType: 'image/jpeg' };
+        
+        await comTimeout(uploadBytes(storageRef, blob, metadata), 25000);
+        fotoUrl = await comTimeout(getDownloadURL(storageRef), 15000);
       }
 
       await comTimeout(addDoc(collection(db, 'marcacoes'), {
@@ -280,33 +220,19 @@ export default function MapScreen() {
         fotoUrl,
         userId: userAtual.uid,
         userName: userAtual.displayName || userAtual.email || 'Usuário',
-        userPhoto: userAtual.photoURL || null,
         createdAt: serverTimestamp(),
-        createdAtMillis: criadoEm,
-        expiresAt: criadoEm + duracao,
+        createdAtMillis: agora,
+        expiresAt: agora + duracaoAlerta,
       }), 15000);
 
-      await AsyncStorage.setItem(`alertasHistorico:${userAtual.uid}`, JSON.stringify([...recentes, criadoEm]));
-
       setModalVisivel(false);
-      setComentario('');
-      setFoto(null);
-      setCoordenadaSelecionada(null);
-      Alert.alert('Alerta publicado', 'Seu alerta já aparece no mapa para outros usuários.');
+      Alert.alert('Sucesso', 'Alerta adicionado ao mapa!');
     } catch (erro) {
-      console.error('Erro ao salvar alerta:', erro);
-      Alert.alert('Erro ao salvar', erro?.message || 'Não consegui salvar o alerta. Verifique Firebase Firestore/Storage e a internet.');
+      console.error("Erro detalhado do Firebase:", erro);
+      Alert.alert('Erro ao Salvar', `Não foi possível carregar o arquivo no Storage. Verifique sua conexão.`);
     } finally {
       setSalvando(false);
     }
-  };
-
-  const centralizarNaMinhaLocalizacao = () => {
-    if (!localizacao) {
-      Alert.alert('Localização não encontrada', 'Ative o GPS e permita localização.');
-      return;
-    }
-    mapRef.current?.animateToRegion({ ...localizacao, latitudeDelta: 0.012, longitudeDelta: 0.012 }, 700);
   };
 
   const abrirPerfil = () => {
@@ -316,6 +242,11 @@ export default function MapScreen() {
     }
     router.push('/perfil');
   };
+
+  const iniciais = useMemo(() => {
+    const nome = usuario?.displayName || usuario?.email || 'Visitante';
+    return nome.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+  }, [usuario]);
 
   return (
     <View style={styles.container}>
@@ -327,20 +258,17 @@ export default function MapScreen() {
         showsMyLocationButton={false}
         initialRegion={regiaoInicial}
         onLongPress={abrirModalMarcacao}
-        toolbarEnabled={false}
+        onDoublePress={abrirModalMarcacao}
+        onRegionChangeComplete={setRegiaoAtual}
       >
         {alertasFiltrados.map(item => (
-          <Marker
-            key={item.id}
-            coordinate={{ latitude: item.latitude, longitude: item.longitude }}
-            pinColor={corDoTipo(item.tipo)}
-          >
+          <Marker key={item.id} coordinate={{ latitude: item.latitude, longitude: item.longitude }} pinColor={corDoTipo(item.tipo)}>
             <Callout tooltip>
               <View style={styles.callout}>
                 <Text style={styles.calloutTitle}>{emojiDoTipo(item.tipo)} {item.tipo}</Text>
                 <Text style={styles.calloutText}>{item.comentario}</Text>
                 {item.fotoUrl && <Image source={{ uri: item.fotoUrl }} style={styles.calloutImage} />}
-                <Text style={styles.calloutFooter}>Por {item.userName || 'Usuário'} • temporário</Text>
+                <Text style={styles.calloutFooter}>Por {item.userName}</Text>
               </View>
             </Callout>
           </Marker>
@@ -349,66 +277,84 @@ export default function MapScreen() {
 
       <View style={styles.searchBox}>
         <TouchableOpacity style={styles.avatar} onPress={abrirPerfil}>
-          {usuario?.photoURL ? <Image source={{ uri: usuario.photoURL }} style={styles.avatarImg} /> : <Text style={styles.avatarText}>{iniciais}</Text>}
+          <Text style={styles.avatarText}>{iniciais}</Text>
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
           <Text style={styles.searchTitle}>Zona de Risco</Text>
-          <Text style={styles.searchSub}>{usuario ? 'Segure no mapa para criar alerta' : 'Modo visitante: visualização liberada'}</Text>
+          <Text style={styles.searchSub}>
+            {usuario ? 'Pressione + ou dê 2 toques' : 'Modo visitante'}
+          </Text>
         </View>
         <TouchableOpacity onPress={() => router.push('/config')}>
           <Text style={styles.config}>⚙️</Text>
         </TouchableOpacity>
       </View>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterBar} contentContainerStyle={{ paddingRight: 20 }}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterBar}>
         {TIPOS_ALERTA.map(tipo => (
-          <TouchableOpacity
-            key={tipo.label}
-            onPress={() => setFiltroAtivo(tipo.label)}
-            style={[styles.chip, filtroAtivo === tipo.label && { backgroundColor: tipo.cor }]}
-          >
+          <TouchableOpacity key={tipo.label} onPress={() => setFiltroAtivo(tipo.label)} style={[styles.chip, filtroAtivo === tipo.label && { backgroundColor: tipo.cor }]}>
             <Text style={[styles.chipText, filtroAtivo === tipo.label && { color: '#fff' }]}>{tipo.emoji} {tipo.label}</Text>
           </TouchableOpacity>
         ))}
       </ScrollView>
 
-      <TouchableOpacity style={styles.locationButton} onPress={centralizarNaMinhaLocalizacao}>
+      <TouchableOpacity style={styles.locationButton} onPress={() => mapRef.current?.animateToRegion({ ...localizacao, latitudeDelta: 0.012, longitudeDelta: 0.012 }, 700)}>
         <Text style={styles.locationText}>📍</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.addButton} onPress={() => {
-        if (!exigirLogin()) return;
-        if (!localizacao) {
-          Alert.alert('Escolha no mapa', 'Segure em um ponto do mapa para criar um alerta exatamente naquele lugar.');
-          return;
-        }
-        setCoordenadaSelecionada(localizacao);
-        setModalVisivel(true);
-      }}>
+      <TouchableOpacity style={styles.addButton} onPress={pressionouBotaoAzul}>
         <Text style={styles.addButtonText}>＋</Text>
       </TouchableOpacity>
 
-      <Modal visible={modalVisivel} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalBox}>
-            <Text style={styles.modalTitle}>Novo alerta</Text>
-            <Text style={styles.modalInfo}>Sem foto: 30 min • Com foto: 1 hora</Text>
+      <Modal visible={modalVisivel} transparent animationType="slide" onRequestClose={() => setModalVisivel(false)}>
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setModalVisivel(false)}>
+          <TouchableOpacity activeOpacity={1} style={styles.modalBox}>
+            
+            <View style={styles.dragIndicator} />
 
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+              <Text style={styles.modalTitle}>Novo alerta</Text>
+              <TouchableOpacity onPress={() => setModalVisivel(false)} style={styles.closeButtonMini}>
+                <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#5f6368' }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            
+            <Text style={styles.sectionLabel}>Selecione o tipo:</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
               {TIPOS_ALERTA.filter(t => t.label !== 'Todos').map(tipo => (
-                <TouchableOpacity
-                  key={tipo.label}
-                  onPress={() => setTipoSelecionado(tipo.label)}
-                  style={[styles.tipoChip, tipoSelecionado === tipo.label && { backgroundColor: tipo.cor }]}
-                >
+                <TouchableOpacity key={tipo.label} onPress={() => setTipoSelecionado(tipo.label)} style={[styles.tipoChip, tipoSelecionado === tipo.label && { backgroundColor: tipo.cor }]}>
                   <Text style={[styles.tipoText, tipoSelecionado === tipo.label && { color: '#fff' }]}>{tipo.emoji} {tipo.label}</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
 
+            <Text style={styles.sectionLabel}>Tempo de permanência no mapa:</Text>
+            <View style={styles.tempoRow}>
+              <TouchableOpacity 
+                onPress={() => setTempoSelecionado(null)} 
+                style={[styles.tempoChipOpcao, tempoSelecionado === null && styles.tempoChipAtivo]}
+              >
+                <Text style={[styles.tempoTextoOpcao, tempoSelecionado === null && styles.tempoTextoAtivo]}>
+                  ⚡ Automático ({foto ? '1h' : '30min'})
+                </Text>
+              </TouchableOpacity>
+              
+              {OPCOES_TEMPO.map(opcao => (
+                <TouchableOpacity 
+                  key={opcao.label} 
+                  onPress={() => setTempoSelecionado(opcao.valor)} 
+                  style={[styles.tempoChipOpcao, tempoSelecionado === opcao.valor && styles.tempoChipAtivo]}
+                >
+                  <Text style={[styles.tempoTextoOpcao, tempoSelecionado === opcao.valor && styles.tempoTextoAtivo]}>
+                    {opcao.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
             <TextInput
               style={styles.input}
-              placeholder="Ex: alagamento nessa rua, poste caído, bloqueio..."
+              placeholder="Descreva a situação atual deste local..."
               placeholderTextColor="#777"
               value={comentario}
               onChangeText={setComentario}
@@ -430,12 +376,12 @@ export default function MapScreen() {
               <TouchableOpacity style={[styles.modalButton, styles.cancelButton]} onPress={() => setModalVisivel(false)} disabled={salvando}>
                 <Text style={styles.cancelText}>Cancelar</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.modalButton, styles.saveButton, salvando && styles.saveButtonDisabled]} onPress={salvarMarcacao} disabled={salvando}>
-                <Text style={styles.saveText}>{salvando ? 'Salvando...' : 'Publicar'}</Text>
+              <TouchableOpacity style={[styles.modalButton, styles.saveButton]} onPress={salvarMarcacao} disabled={salvando}>
+                <Text style={styles.saveText}>{salvando ? 'Publicando...' : 'Publicar'}</Text>
               </TouchableOpacity>
             </View>
-          </View>
-        </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
       </Modal>
     </View>
   );
@@ -450,7 +396,6 @@ const styles = StyleSheet.create({
     elevation: 7, shadowColor: '#000', shadowOpacity: 0.16, shadowRadius: 8,
   },
   avatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#e8f0fe', alignItems: 'center', justifyContent: 'center' },
-  avatarImg: { width: 42, height: 42, borderRadius: 21 },
   avatarText: { color: '#1a73e8', fontWeight: 'bold' },
   searchTitle: { fontSize: 16, fontWeight: '700', color: '#202124' },
   searchSub: { fontSize: 12, color: '#5f6368', marginTop: 1 },
@@ -458,27 +403,28 @@ const styles = StyleSheet.create({
   filterBar: { position: 'absolute', top: 112, left: 14, right: 0 },
   chip: { backgroundColor: '#fff', paddingHorizontal: 14, paddingVertical: 9, borderRadius: 22, marginRight: 8, elevation: 4 },
   chipText: { color: '#202124', fontWeight: '600' },
-  locationButton: {
-    position: 'absolute', right: 18, bottom: 112, width: 52, height: 52, borderRadius: 26,
-    backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', elevation: 7,
-  },
+  locationButton: { position: 'absolute', right: 18, bottom: 112, width: 52, height: 52, borderRadius: 26, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', elevation: 7 },
   locationText: { fontSize: 22 },
-  addButton: {
-    position: 'absolute', right: 18, bottom: 42, width: 58, height: 58, borderRadius: 29,
-    backgroundColor: '#1a73e8', alignItems: 'center', justifyContent: 'center', elevation: 8,
-  },
+  addButton: { position: 'absolute', right: 18, bottom: 42, width: 58, height: 58, borderRadius: 29, backgroundColor: '#1a73e8', alignItems: 'center', justifyContent: 'center', elevation: 8 },
   addButtonText: { color: '#fff', fontSize: 34, marginTop: -2 },
-  callout: { width: 230, backgroundColor: '#fff', borderRadius: 14, padding: 12, elevation: 8 },
+  callout: { width: 230, backgroundColor: '#fff', borderRadius: 14, padding: 12 },
   calloutTitle: { fontSize: 16, fontWeight: 'bold', color: '#202124', marginBottom: 4 },
   calloutText: { fontSize: 14, color: '#3c4043', marginBottom: 8 },
   calloutImage: { width: '100%', height: 125, borderRadius: 10, marginBottom: 8 },
   calloutFooter: { fontSize: 11, color: '#5f6368' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'flex-end' },
-  modalBox: { backgroundColor: '#fff', padding: 18, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
+  modalBox: { backgroundColor: '#fff', padding: 18, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingBottom: Platform.OS === 'ios' ? 34 : 18 },
+  dragIndicator: { width: 40, height: 5, backgroundColor: '#e0e0e0', borderRadius: 3, alignSelf: 'center', marginBottom: 10 },
+  closeButtonMini: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#f1f3f4', alignItems: 'center', justifyContent: 'center' },
   modalTitle: { fontSize: 21, fontWeight: 'bold', color: '#202124' },
-  modalInfo: { color: '#5f6368', marginTop: 4, marginBottom: 14 },
+  sectionLabel: { fontSize: 14, fontWeight: '700', color: '#5f6368', marginTop: 8, marginBottom: 6 },
   tipoChip: { backgroundColor: '#f1f3f4', paddingHorizontal: 12, paddingVertical: 9, borderRadius: 18, marginRight: 8 },
   tipoText: { fontWeight: '600', color: '#202124' },
+  tempoRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 14 },
+  tempoChipOpcao: { backgroundColor: '#f1f3f4', paddingHorizontal: 10, paddingVertical: 8, borderRadius: 12 },
+  tempoChipAtivo: { backgroundColor: '#1a73e8' },
+  tempoTextoOpcao: { fontSize: 13, color: '#202124', fontWeight: '600' },
+  tempoTextoAtivo: { color: '#fff' },
   input: { minHeight: 85, backgroundColor: '#f8fafd', borderRadius: 14, padding: 12, color: '#202124', textAlignVertical: 'top', borderWidth: 1, borderColor: '#e0e0e0' },
   preview: { width: '100%', height: 170, borderRadius: 14, marginTop: 12 },
   photoRow: { flexDirection: 'row', gap: 10, marginTop: 12 },
@@ -488,7 +434,6 @@ const styles = StyleSheet.create({
   modalButton: { paddingHorizontal: 18, paddingVertical: 12, borderRadius: 12 },
   cancelButton: { backgroundColor: '#f1f3f4' },
   saveButton: { backgroundColor: '#1a73e8' },
-  saveButtonDisabled: { backgroundColor: '#8ab4f8' },
   cancelText: { color: '#202124', fontWeight: '700' },
   saveText: { color: '#fff', fontWeight: '700' },
 });
