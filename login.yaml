@@ -1,0 +1,14 @@
+appId: com.alinelasneau.areaderisco
+
+---
+- launchApp
+
+- tapOn: "Email"
+- inputText: "teste@email.com"
+
+- tapOn: "Senha"
+- inputText: "123456"
+
+- tapOn: "Entrar"
+
+- assertVisible: "Bem-vindo"
