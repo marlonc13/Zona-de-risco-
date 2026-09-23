@@ -24,7 +24,7 @@ export default function Login() {
 
         <Text style={styles.nome}>Login</Text>
         <Text style={styles.subtitulo}>
-          Entre com sua conta para publicar alertas. Sem login, você ainda consegue ver o mapa.
+          Entre para acessar seu perfil e endereço. Administradores também gerenciam ocorrências.
         </Text>
 
 

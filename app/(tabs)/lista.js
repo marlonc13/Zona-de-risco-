@@ -1,25 +1,34 @@
-import { View, Text, FlatList, Image, ActivityIndicator, Dimensions } from 'react-native';
+import { View, Text, FlatList, Image, ActivityIndicator } from 'react-native';
 import { useState, useEffect } from 'react';
 import { getFirestore, collection, onSnapshot } from 'firebase/firestore';
-import app from '../../services/firebaseConfig';
+import app, { auth } from '../../services/firebaseConfig';
 import styles from '../../styles/lista.styles';
+import { onAuthStateChanged } from 'firebase/auth';
+import { useRouter } from 'expo-router';
+import { isAdminUser } from '../../services/accessControl';
 
 const db = getFirestore(app);
 
 function emojiDoTipo(tipo) {
   const tipos = [
     { label: 'Alagamento', emoji: '🌊' },
+    { label: 'Enchente', emoji: '🌧️' },
     { label: 'Deslizamento', emoji: '⛰️' },
-    { label: 'Bloqueio', emoji: '🚧' },
-    { label: 'Acidente', emoji: '⚠️' },
-    { label: 'Outro', emoji: '📍' },
+    { label: 'Vendaval', emoji: '🌪️' },
+    { label: 'Seca', emoji: '☀️' },
+    { label: 'Incêndio florestal', emoji: '🔥' },
   ];
   return tipos.find(item => item.label === tipo)?.emoji || '📍';
 }
 
 export default function ListaAlertasScreen() {
+  const router = useRouter();
   const [alertas, setAlertas] = useState([]);
   const [carregando, setCarregando] = useState(true);
+
+  useEffect(() => onAuthStateChanged(auth, user => {
+    if (!isAdminUser(user)) router.replace('/mapa');
+  }), [router]);
 
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, 'marcacoes'), snapshot => {

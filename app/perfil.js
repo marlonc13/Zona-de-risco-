@@ -6,6 +6,7 @@ import app from '../services/firebaseConfig';
 import { getAuth, updateProfile, updatePassword, signOut } from 'firebase/auth';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import styles from '../styles/perfil.styles';
+import { isAdminUser } from '../services/accessControl';
 
 const auth = getAuth(app);
 const storage = getStorage(app);
@@ -32,7 +33,7 @@ export default function Perfil() {
     setNome(user.displayName || '');
     setEmail(user.email || '');
     setFoto(user.photoURL || null);
-  }, []);
+  }, [router]);
 
   const escolherFoto = async () => {
     const permissao = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -110,7 +111,14 @@ export default function Perfil() {
 
       <TextInput style={styles.input} placeholder="Nome" value={nome} onChangeText={setNome} />
       <TextInput style={[styles.input, styles.disabled]} placeholder="Email" value={email} editable={false} />
+      <Text style={{ color: isAdminUser(auth.currentUser) ? '#d93025' : '#5f6368', fontWeight: '800', marginBottom: 12 }}>
+        Perfil: {isAdminUser(auth.currentUser) ? 'Administrador' : 'Usuário'}
+      </Text>
       <TextInput style={styles.input} placeholder="Nova senha (opcional)" secureTextEntry value={senha} onChangeText={setSenha} />
+
+      <TouchableOpacity style={styles.secondaryButton} onPress={() => router.push('/endereco')}>
+        <Text style={styles.secondaryText}>🏠 Adicionar ou mudar endereço</Text>
+      </TouchableOpacity>
 
       <TouchableOpacity style={styles.button} onPress={salvar} disabled={salvando}>
         <Text style={styles.buttonText}>{salvando ? 'Salvando...' : 'Salvar alterações'}</Text>

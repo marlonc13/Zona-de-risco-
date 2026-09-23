@@ -1,15 +1,16 @@
-import { View, Text, TouchableOpacity, Alert, ScrollView, Modal, TextInput, Image, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, Alert, ScrollView, Modal, TextInput, Image } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE, Callout } from 'react-native-maps';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp } from 'firebase/firestore';
 import app from '../../services/firebaseConfig';
 import styles from '../../styles/mapa.styles';
+import { isAdminUser } from '../../services/accessControl';
+import { avisarAlertasProximos } from '../../services/proximityNotifications';
 
 const db = getFirestore(app);
 const auth = getAuth(app);
@@ -24,10 +25,11 @@ const REGIAO_PADRAO = {
 const TIPOS_ALERTA = [
   { label: 'Todos', emoji: '🗺️', cor: '#1a73e8' },
   { label: 'Alagamento', emoji: '🌊', cor: '#1a73e8' },
+  { label: 'Enchente', emoji: '🌧️', cor: '#0b57d0' },
   { label: 'Deslizamento', emoji: '⛰️', cor: '#e8710a' },
-  { label: 'Bloqueio', emoji: '🚧', cor: '#fbbc04' },
-  { label: 'Acidente', emoji: '⚠️', cor: '#d93025' },
-  { label: 'Outro', emoji: '📍', cor: '#5f6368' },
+  { label: 'Vendaval', emoji: '🌪️', cor: '#7b1fa2' },
+  { label: 'Seca', emoji: '☀️', cor: '#f9ab00' },
+  { label: 'Incêndio florestal', emoji: '🔥', cor: '#d93025' },
 ];
 
 const OPCOES_TEMPO = [
@@ -68,6 +70,7 @@ export default function MapScreen() {
   const [foto, setFoto] = useState(null);
   const [salvando, setSalvando] = useState(false);
   const [tempoSelecionado, setTempoSelecionado] = useState(null); 
+  const administrador = isAdminUser(usuario);
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, user => setUsuario(user));
@@ -92,15 +95,33 @@ export default function MapScreen() {
   }, []);
 
   useEffect(() => {
+    let inscricao;
+    const acompanhar = async () => {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') return;
+      inscricao = await Location.watchPositionAsync(
+        { accuracy: Location.Accuracy.Balanced, timeInterval: 60000, distanceInterval: 50 },
+        posicao => setLocalizacao({ latitude: posicao.coords.latitude, longitude: posicao.coords.longitude })
+      );
+    };
+    acompanhar();
+    return () => inscricao?.remove();
+  }, []);
+
+  useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, 'marcacoes'), snapshot => {
       const agora = Date.now();
       const dados = snapshot.docs
         .map(doc => ({ id: doc.id, ...doc.data() }))
         .filter(item => item.expiresAt && item.expiresAt > agora);
       setAlertas(dados);
-    });
+    }, erro => console.error('Erro ao carregar alertas:', erro));
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    avisarAlertasProximos(localizacao, alertas).catch(erro => console.error('Erro nas notificações:', erro));
+  }, [localizacao, alertas]);
 
   const alertasFiltrados = useMemo(() => {
     if (filtroAtivo === 'Todos') return alertas;
@@ -108,10 +129,10 @@ export default function MapScreen() {
   }, [alertas, filtroAtivo]);
 
   const exigirLogin = () => {
-    if (!usuario) {
-      Alert.alert('Login necessário', 'Você precisa entrar na sua conta para criar marcações.', [
+    if (!administrador) {
+      Alert.alert('Acesso administrativo', 'Somente administradores podem publicar ocorrências.', [
         { text: 'Cancelar', style: 'cancel' },
-        { text: 'Entrar', onPress: () => router.push('/login') },
+        ...(!usuario ? [{ text: 'Entrar', onPress: () => router.push('/login') }] : []),
       ]);
       return false;
     }
@@ -166,6 +187,11 @@ export default function MapScreen() {
     if (salvando) return;
     const userAtual = auth.currentUser || usuario;
     const texto = comentario.trim();
+
+    if (!isAdminUser(userAtual)) {
+      Alert.alert('Acesso negado', 'Somente administradores podem publicar alertas.');
+      return;
+    }
 
     if (!texto) {
       Alert.alert('Aviso', 'Escreva uma breve descrição do problema.');
@@ -225,7 +251,7 @@ export default function MapScreen() {
       router.push('/login');
       return;
     }
-    router.push('/perfil');
+    router.push(administrador ? '/admin' : '/perfil');
   };
 
   const iniciais = useMemo(() => {
@@ -267,7 +293,7 @@ export default function MapScreen() {
         <View style={{ flex: 1 }}>
           <Text style={styles.searchTitle}>Zona de Risco</Text>
           <Text style={styles.searchSub}>
-            {usuario ? 'Pressione + ou dê 2 toques' : 'Modo visitante'}
+            {administrador ? 'Modo administrador: publique ocorrências' : usuario ? 'Alertas naturais próximos de você' : 'Modo visitante: somente consulta'}
           </Text>
         </View>
         <TouchableOpacity onPress={() => router.push('/config')}>
@@ -287,9 +313,11 @@ export default function MapScreen() {
         <Text style={styles.locationText}>📍</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.addButton} onPress={pressionouBotaoAzul}>
-        <Text style={styles.addButtonText}>＋</Text>
-      </TouchableOpacity>
+      {administrador && (
+        <TouchableOpacity style={styles.addButton} onPress={pressionouBotaoAzul}>
+          <Text style={styles.addButtonText}>＋</Text>
+        </TouchableOpacity>
+      )}
 
       <Modal visible={modalVisivel} transparent animationType="slide" onRequestClose={() => setModalVisivel(false)}>
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setModalVisivel(false)}>
@@ -298,7 +326,7 @@ export default function MapScreen() {
             <View style={styles.dragIndicator} />
 
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-              <Text style={styles.modalTitle}>Novo alerta</Text>
+              <Text style={styles.modalTitle}>Nova ocorrência natural</Text>
               <TouchableOpacity onPress={() => setModalVisivel(false)} style={styles.closeButtonMini}>
                 <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#5f6368' }}>✕</Text>
               </TouchableOpacity>
