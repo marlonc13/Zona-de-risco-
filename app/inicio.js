@@ -23,7 +23,7 @@ export default function Inicio() {
         </View>
         
         <Text style={styles.title}>Zona de Risco</Text>
-        <Text style={styles.subtitle}>Veja alertas próximos no mapa ou entre para criar novas marcações.</Text>
+        <Text style={styles.subtitle}>Receba alertas de riscos naturais próximos da sua localização.</Text>
 
         <TouchableOpacity style={styles.primaryButton} onPress={() => router.replace('/mapa')}>
           <Text style={styles.primaryText}>Entrar como visitante</Text>
@@ -33,7 +33,7 @@ export default function Inicio() {
           <Text style={styles.secondaryText}>Fazer login / criar conta</Text>
         </TouchableOpacity>
 
-        <Text style={styles.note}>Visitantes conseguem ver alertas. Para publicar alerta com foto, é necessário login.</Text>
+        <Text style={styles.note}>Visitantes e usuários consultam alertas. Somente administradores publicam ocorrências.</Text>
       </View>
     </ImageBackground>
   );

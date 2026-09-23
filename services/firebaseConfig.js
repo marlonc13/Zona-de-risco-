@@ -8,12 +8,12 @@ import { getStorage } from "firebase/storage";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCUBxoQP9OT4hPMH6FoqaWLSX3rkipHOzY",
-  authDomain: "zona-de-risco-af5c7.firebaseapp.com",
-  projectId: "zona-de-risco-af5c7",
-  storageBucket: "zona-de-risco-af5c7.firebasestorage.app",
-  messagingSenderId: "1046060560404",
-  appId: "1:1046060560404:web:99e5b1a431cb0ba7c73701"
+  apiKey: "AIzaSyANbtmjcMMp2bXn37JHX_MTkLJxWe0cLIg",
+  authDomain: "zona-de-risco.firebaseapp.com",
+  projectId: "zona-de-risco",
+  storageBucket: "zona-de-risco.firebasestorage.app",
+  messagingSenderId: "381656913472",
+  appId: "1:381656913472:web:42a11f12a9432d1c9231a5",
 };
 // Inicializa o Firebase apenas uma vez
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);

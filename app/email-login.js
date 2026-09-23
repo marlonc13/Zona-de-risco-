@@ -6,6 +6,7 @@ import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfi
 import { auth } from '../services/firebaseConfig';
 import { authenticateWithBiometrics } from '../services/biometricAuth';
 import styles from '../styles/email-login.styles';
+import { isAdminUser } from '../services/accessControl';
 
 export default function EmailLogin() {
   const router = useRouter();
@@ -24,13 +25,13 @@ export default function EmailLogin() {
     const resultado = await authenticateWithBiometrics();
 
     if (resultado?.success) {
-      router.replace('/mapa');
+      router.replace(isAdminUser(user) ? '/admin' : '/mapa');
       return;
     }
 
     if (resultado?.message === 'Sem suporte a biometria' || resultado?.message === 'Cadastre biometria no celular') {
       Alert.alert('Biometria não disponível', 'O login foi feito. Cadastre biometria no celular para usar essa proteção nas próximas entradas.');
-      router.replace('/mapa');
+      router.replace(isAdminUser(user) ? '/admin' : '/mapa');
       return;
     }
 
@@ -77,7 +78,7 @@ export default function EmailLogin() {
       if (error.code === 'auth/email-already-in-use') mensagem = 'Esse e-mail já tem conta. Troque para "Entrar" em vez de criar conta.';
       if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password') mensagem = 'E-mail ou senha incorretos.';
       if (error.code === 'auth/user-not-found') mensagem = 'Conta não encontrada. Troque para "Criar conta".';
-      if (error.code === 'auth/invalid-email') messaging = 'Digite um e-mail válido.';
+      if (error.code === 'auth/invalid-email') mensagem = 'Digite um e-mail válido.';
       if (error.code === 'auth/operation-not-allowed') mensagem = 'Ative o provedor E-mail/Senha no Firebase Authentication.';
 
       Alert.alert('Erro', mensagem);

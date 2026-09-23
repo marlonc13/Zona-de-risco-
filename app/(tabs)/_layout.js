@@ -1,12 +1,18 @@
 import { Tabs } from 'expo-router';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Text } from 'react-native';
 
 import { Colors } from '../../constants/theme';
 import { useColorScheme } from '../../hooks/use-color-scheme';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from '../../services/firebaseConfig';
+import { isAdminUser } from '../../services/accessControl';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme() ?? 'light';
+  const [administrador, setAdministrador] = useState(false);
+
+  useEffect(() => onAuthStateChanged(auth, user => setAdministrador(isAdminUser(user))), []);
 
   return (
     <Tabs
@@ -41,6 +47,7 @@ export default function TabLayout() {
         name="lista"
         options={{
           title: 'Alertas',
+          href: administrador ? undefined : null,
           tabBarIcon: ({ color }) => (
             <Text style={{ fontSize: 22 }}>⚠️</Text>
           ),
