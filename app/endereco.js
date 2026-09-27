@@ -19,7 +19,7 @@ export default function Endereco() {
   useEffect(() => {
     const carregar = async () => {
       const user = auth.currentUser;
-      if (!user) return router.replace('/login');
+      if (!user) return router.replace('/email-login');
       const snapshot = await getDoc(doc(db, 'usuarios', user.uid));
       const dados = snapshot.data()?.endereco;
       if (dados) {

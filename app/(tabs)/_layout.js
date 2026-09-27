@@ -6,13 +6,20 @@ import { Colors } from '../../constants/theme';
 import { useColorScheme } from '../../hooks/use-color-scheme';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../../services/firebaseConfig';
-import { isAdminUser } from '../../services/accessControl';
+import { observarStatusAdministrador } from '../../services/accessControl';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme() ?? 'light';
   const [administrador, setAdministrador] = useState(false);
 
-  useEffect(() => onAuthStateChanged(auth, user => setAdministrador(isAdminUser(user))), []);
+  useEffect(() => {
+    let pararAdmin = () => {};
+    const pararAuth = onAuthStateChanged(auth, user => {
+      pararAdmin();
+      pararAdmin = observarStatusAdministrador(user, setAdministrador);
+    });
+    return () => { pararAuth(); pararAdmin(); };
+  }, []);
 
   return (
     <Tabs
@@ -42,6 +49,16 @@ export default function TabLayout() {
         }}
       />
 
+      <Tabs.Screen
+        name="abrigos"
+        options={{
+          title: 'Abrigos',
+          tabBarIcon: () => (
+            <Text style={{ fontSize: 22 }}>🏠</Text>
+          ),
+        }}
+      />
+
       
       <Tabs.Screen
         name="lista"
@@ -50,6 +67,17 @@ export default function TabLayout() {
           href: administrador ? undefined : null,
           tabBarIcon: ({ color }) => (
             <Text style={{ fontSize: 22 }}>⚠️</Text>
+          ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="relatorio"
+        options={{
+          title: 'Relatório',
+          href: administrador ? undefined : null,
+          tabBarIcon: () => (
+            <Text style={{ fontSize: 22 }}>📊</Text>
           ),
         }}
       />

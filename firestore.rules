@@ -7,6 +7,14 @@ service cloud.firestore {
     }
 
     function ehAdministrador() {
+      return estaLogado() && (
+        request.auth.token.email == 'alinelasneau@gmail.com'
+        || (exists(/databases/$(database)/documents/administradores/$(request.auth.token.email))
+          && get(/databases/$(database)/documents/administradores/$(request.auth.token.email)).data.ativo == true)
+      );
+    }
+
+    function ehAdministradorPrincipal() {
       return estaLogado()
         && request.auth.token.email == 'alinelasneau@gmail.com';
     }
@@ -16,9 +24,19 @@ service cloud.firestore {
       allow create, update, delete: if ehAdministrador();
     }
 
+    match /abrigos/{abrigoId} {
+      allow read: if true;
+      allow create, update, delete: if ehAdministrador();
+    }
+
     match /usuarios/{usuarioId} {
       allow read, create, update, delete: if estaLogado()
         && request.auth.uid == usuarioId;
+    }
+
+    match /administradores/{email} {
+      allow read: if ehAdministrador();
+      allow create, update, delete: if ehAdministradorPrincipal();
     }
   }
 }

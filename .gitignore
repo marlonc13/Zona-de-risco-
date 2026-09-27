@@ -6,7 +6,6 @@ node_modules/
 # Expo
 .expo/
 dist/
-dist-android-check/
 web-build/
 expo-env.d.ts
 
@@ -43,3 +42,5 @@ app-example
 /ios
 /android
 *.apk
+
+dist-*-check/

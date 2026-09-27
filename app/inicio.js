@@ -29,7 +29,7 @@ export default function Inicio() {
           <Text style={styles.primaryText}>Entrar como visitante</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.secondaryButton} onPress={() => router.push('/login')}>
+        <TouchableOpacity style={styles.secondaryButton} onPress={() => router.push('/email-login')}>
           <Text style={styles.secondaryText}>Fazer login / criar conta</Text>
         </TouchableOpacity>
 

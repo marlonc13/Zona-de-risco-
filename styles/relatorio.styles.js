@@ -1,0 +1,28 @@
+import { StyleSheet } from 'react-native';
+
+export default StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#f5f7fb' },
+  content: { paddingTop: 54, paddingHorizontal: 16, paddingBottom: 120 },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  badge: { alignSelf: 'flex-start', color: '#fff', backgroundColor: '#1a73e8', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 14, fontSize: 10, fontWeight: '900' },
+  title: { color: '#202124', fontSize: 25, fontWeight: '900', marginTop: 10 },
+  subtitle: { color: '#5f6368', marginTop: 3, marginBottom: 16 },
+  summaryRow: { flexDirection: 'row', gap: 8 },
+  summaryCard: { flex: 1, backgroundColor: '#fff', borderRadius: 14, padding: 12, borderWidth: 1, borderColor: '#e1e5ea' },
+  summaryNumber: { color: '#1a73e8', fontSize: 25, fontWeight: '900' },
+  summaryLabel: { color: '#5f6368', fontSize: 11, fontWeight: '700', marginTop: 2 },
+  section: { backgroundColor: '#fff', borderRadius: 16, padding: 15, marginTop: 13, borderWidth: 1, borderColor: '#e1e5ea' },
+  sectionTitle: { color: '#202124', fontSize: 16, fontWeight: '900', marginBottom: 10 },
+  metric: { marginBottom: 11 },
+  metricHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 },
+  metricName: { color: '#3c4043', fontSize: 12, fontWeight: '700' },
+  metricTotal: { color: '#1a73e8', fontWeight: '900' },
+  barTrack: { height: 8, backgroundColor: '#e8f0fe', borderRadius: 4, overflow: 'hidden' },
+  barFill: { height: '100%', backgroundColor: '#1a73e8', borderRadius: 4 },
+  rowItem: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: '#f1f3f4' },
+  rowName: { flex: 1, color: '#3c4043', fontWeight: '700' },
+  rowTotal: { color: '#1a73e8', fontWeight: '900' },
+  empty: { color: '#80868b', fontStyle: 'italic' },
+  pdfButton: { backgroundColor: '#d93025', padding: 15, borderRadius: 14, alignItems: 'center', marginTop: 16 },
+  pdfButtonText: { color: '#fff', fontWeight: '900', fontSize: 15 },
+});

@@ -1,7 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 
-const RAIO_ALERTA_KM = 5;
 const estaNoExpoGo = Constants.appOwnership === 'expo';
 let notificacoesConfiguradas = false;
 
@@ -25,7 +24,7 @@ async function carregarNotificacoes() {
   return Notifications;
 }
 
-function distanciaKm(origem, destino) {
+export function distanciaKm(origem, destino) {
   const rad = valor => (valor * Math.PI) / 180;
   const raioTerra = 6371;
   const dLat = rad(destino.latitude - origem.latitude);
@@ -46,8 +45,8 @@ export async function solicitarPermissaoNotificacoes() {
   return resposta.granted;
 }
 
-export async function avisarAlertasProximos(localizacao, alertas) {
-  if (!localizacao || !alertas.length) return;
+export async function avisarAlertasProximos(localizacao, alertas, enderecoMonitorado = null) {
+  if ((!localizacao && !enderecoMonitorado) || !alertas.length) return;
 
   const Notifications = await carregarNotificacoes();
   if (!Notifications) return;
@@ -60,12 +59,19 @@ export async function avisarAlertasProximos(localizacao, alertas) {
 
   for (const alerta of alertas) {
     if (idsAvisados.includes(alerta.id)) continue;
-    const distancia = distanciaKm(localizacao, alerta);
-    if (distancia <= RAIO_ALERTA_KM) {
+    const raioKm = (alerta.raioMetros || 1000) / 1000;
+    const distanciaAtual = localizacao ? distanciaKm(localizacao, alerta) : Infinity;
+    const distanciaCasa = enderecoMonitorado ? distanciaKm(enderecoMonitorado, alerta) : Infinity;
+    const pertoDaLocalizacao = distanciaAtual <= raioKm;
+    const pertoDaCasa = distanciaCasa <= raioKm;
+
+    if (pertoDaLocalizacao || pertoDaCasa) {
+      const referencia = pertoDaLocalizacao ? 'da sua localização' : 'da sua residência';
+      const distancia = pertoDaLocalizacao ? distanciaAtual : distanciaCasa;
       await Notifications.scheduleNotificationAsync({
         content: {
-          title: `${alerta.tipo} próximo de você`,
-          body: `${alerta.comentario} (${distancia.toFixed(1)} km)`,
+          title: `${alerta.gravidade || 'Atenção'}: ${alerta.tipo}`,
+          body: `${alerta.comentario} — a ${distancia.toFixed(1)} km ${referencia}.`,
           data: { alertaId: alerta.id },
         },
         trigger: null,

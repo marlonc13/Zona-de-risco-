@@ -4,7 +4,26 @@ service firebase.storage {
   match /b/{bucket}/o {
     match /usuarios/{usuarioId}/{arquivo=**} {
       allow read: if true;
-      allow write: if request.auth != null && request.auth.uid == usuarioId;
+      allow write: if request.auth != null
+        && request.auth.uid == usuarioId
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+
+    match /ocorrencias/{usuarioId}/{arquivo=**} {
+      allow read: if true;
+      allow write: if request.auth != null
+        && request.auth.uid == usuarioId
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+
+    match /abrigos/{usuarioId}/{arquivo=**} {
+      allow read: if true;
+      allow write: if request.auth != null
+        && request.auth.uid == usuarioId
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
     }
   }
 }

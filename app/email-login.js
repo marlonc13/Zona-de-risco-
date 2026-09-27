@@ -6,7 +6,7 @@ import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfi
 import { auth } from '../services/firebaseConfig';
 import { authenticateWithBiometrics } from '../services/biometricAuth';
 import styles from '../styles/email-login.styles';
-import { isAdminUser } from '../services/accessControl';
+import { verificarAdministrador } from '../services/accessControl';
 
 export default function EmailLogin() {
   const router = useRouter();
@@ -14,6 +14,7 @@ export default function EmailLogin() {
   const [nome, setNome] = useState('');
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
+  const [mostrarSenha, setMostrarSenha] = useState(false);
   const [carregando, setCarregando] = useState(false);
 
   const entrarNoApp = async (user) => {
@@ -22,16 +23,19 @@ export default function EmailLogin() {
     await AsyncStorage.setItem('userEmail', user.email || email.trim());
     await AsyncStorage.setItem('biometriaAtiva', 'true');
 
-    const resultado = await authenticateWithBiometrics();
+    const [resultado, administrador] = await Promise.all([
+      authenticateWithBiometrics(),
+      verificarAdministrador(user),
+    ]);
 
     if (resultado?.success) {
-      router.replace(isAdminUser(user) ? '/admin' : '/mapa');
+      router.replace(administrador ? '/admin' : '/mapa');
       return;
     }
 
     if (resultado?.message === 'Sem suporte a biometria' || resultado?.message === 'Cadastre biometria no celular') {
       Alert.alert('Biometria não disponível', 'O login foi feito. Cadastre biometria no celular para usar essa proteção nas próximas entradas.');
-      router.replace(isAdminUser(user) ? '/admin' : '/mapa');
+      router.replace(administrador ? '/admin' : '/mapa');
       return;
     }
 
@@ -124,14 +128,19 @@ export default function EmailLogin() {
           keyboardType="email-address"
         />
 
-        <TextInput
-          style={styles.input}
-          placeholder="Senha"
-          placeholderTextColor="#777"
-          value={senha}
-          onChangeText={setSenha}
-          secureTextEntry
-        />
+        <View style={styles.passwordBox}>
+          <TextInput
+            style={styles.passwordInput}
+            placeholder="Senha"
+            placeholderTextColor="#777"
+            value={senha}
+            onChangeText={setSenha}
+            secureTextEntry={!mostrarSenha}
+          />
+          <TouchableOpacity style={styles.eyeButton} onPress={() => setMostrarSenha(atual => !atual)}>
+            <Text style={styles.eyeText}>{mostrarSenha ? '🙈' : '👁️'}</Text>
+          </TouchableOpacity>
+        </View>
 
         <TouchableOpacity style={styles.button} onPress={enviar} disabled={carregando}>
           {carregando ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>{modoCadastro ? 'Criar e entrar' : 'Entrar com senha'}</Text>}
@@ -145,7 +154,7 @@ export default function EmailLogin() {
           <Text style={styles.visitanteText}>Continuar como visitante</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.voltarButton} onPress={() => router.replace('/login')} disabled={carregando}>
+        <TouchableOpacity style={styles.voltarButton} onPress={() => router.replace('/inicio')} disabled={carregando}>
           <Text style={styles.voltarText}>Voltar</Text>
         </TouchableOpacity>
       </KeyboardAvoidingView>
