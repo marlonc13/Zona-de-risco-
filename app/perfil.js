@@ -4,11 +4,13 @@ import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import app from '../services/firebaseConfig';
 import { EmailAuthProvider, getAuth, onAuthStateChanged, reauthenticateWithCredential, signOut, updatePassword, updateProfile } from 'firebase/auth';
+import { doc, getDoc, getFirestore, serverTimestamp, setDoc } from 'firebase/firestore';
 import styles from '../styles/perfil.styles';
 import { observarStatusAdministrador } from '../services/accessControl';
 import { uploadImage } from '../services/imageUpload';
 
 const auth = getAuth(app);
+const db = getFirestore(app);
 export default function Perfil() {
   const router = useRouter();
   const [nome, setNome] = useState('');
@@ -40,6 +42,13 @@ export default function Perfil() {
     setNome(user.displayName || '');
     setEmail(user.email || '');
     setFoto(user.photoURL || null);
+    getDoc(doc(db, 'usuarios', user.uid))
+      .then(snapshot => {
+        if (snapshot.exists() && snapshot.data()?.photoUrl) {
+          setFoto(snapshot.data().photoUrl);
+        }
+      })
+      .catch(error => console.warn('Não foi possível carregar a foto do perfil:', error));
   }, [router]);
 
   const escolherFoto = async () => {
@@ -50,7 +59,7 @@ export default function Perfil() {
     }
     const result = await ImagePicker.launchImageLibraryAsync
     ({ mediaTypes: ['images'],
-      quality: 0.7, allowsEditing: true, aspect: [1, 1] });
+      quality: 0.2, allowsEditing: true, aspect: [1, 1] });
     if (!result.canceled) setFoto(result.assets[0].uri);
   };
 
@@ -60,7 +69,7 @@ export default function Perfil() {
       Alert.alert('Permissão necessária', 'Permita acesso à câmera.');
       return;
     }
-    const result = await ImagePicker.launchCameraAsync({ quality: 0.7, allowsEditing: true, aspect: [1, 1] });
+    const result = await ImagePicker.launchCameraAsync({ quality: 0.2, allowsEditing: true, aspect: [1, 1] });
     if (!result.canceled) setFoto(result.assets[0].uri);
   };
 
@@ -70,19 +79,26 @@ export default function Perfil() {
 
     try {
       setSalvandoPerfil(true);
-      let photoURL = user.photoURL;
+      let photoUrl = foto;
 
-      if (foto && foto !== user.photoURL) {
-        photoURL = await uploadImage(foto, `usuarios/${user.uid}/perfil-${Date.now()}.jpg`);
+      if (foto && !foto.startsWith('http') && !foto.startsWith('data:')) {
+        photoUrl = await uploadImage(foto);
       }
 
-      await updateProfile(user, { displayName: nome.trim() || 'Usuário', photoURL });
-      setFoto(photoURL);
+      const nomeFinal = nome.trim() || 'Usuário';
+      await updateProfile(user, { displayName: nomeFinal });
+      await setDoc(doc(db, 'usuarios', user.uid), {
+        nome: nomeFinal,
+        email: user.email,
+        photoUrl: photoUrl || null,
+        atualizadoEm: serverTimestamp(),
+      }, { merge: true });
+      setFoto(photoUrl || null);
       Alert.alert('Sucesso', 'Nome e foto atualizados.');
     } catch (error) {
       console.error('Erro ao atualizar perfil:', error);
       let mensagem = `Não foi possível salvar a foto. Código: ${error.code || 'desconhecido'}.`;
-      if (error.code === 'storage/unauthorized') mensagem = 'O Firebase bloqueou a foto. Publique o arquivo storage.rules atualizado no Firebase Storage.';
+      if (error.code === 'permission-denied') mensagem = 'O Firebase bloqueou a atualização do perfil. Confira as regras da coleção usuarios.';
       Alert.alert('Erro', mensagem);
     } finally {
       setSalvandoPerfil(false);
