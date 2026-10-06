@@ -14,14 +14,24 @@ export default function AdministradoresScreen() {
   const [nome, setNome] = useState('');
   const [administradores, setAdministradores] = useState([]);
   const [salvando, setSalvando] = useState(false);
+  const [autorizada, setAutorizada] = useState(false);
 
-  useEffect(() => onAuthStateChanged(auth, user => {
-    if (!isMainAdmin(user)) router.replace('/mapa');
-  }), [router]);
-
-  useEffect(() => onSnapshot(collection(db, 'administradores'), snapshot => {
-    setAdministradores(snapshot.docs.map(item => ({ email: item.id, ...item.data() })).sort((a, b) => a.email.localeCompare(b.email)));
-  }, erro => console.error('Erro ao listar administradores:', erro)), []);
+  useEffect(() => {
+    let pararLista = () => {};
+    const pararAuth = onAuthStateChanged(auth, user => {
+      pararLista();
+      if (!isMainAdmin(user)) {
+        setAutorizada(false);
+        router.replace('/mapa');
+        return;
+      }
+      setAutorizada(true);
+      pararLista = onSnapshot(collection(db, 'administradores'), snapshot => {
+        setAdministradores(snapshot.docs.map(item => ({ email: item.id, ...item.data() })).sort((a, b) => a.email.localeCompare(b.email)));
+      }, erro => console.error('Erro ao listar administradores:', erro));
+    });
+    return () => { pararAuth(); pararLista(); };
+  }, [router]);
 
   const cadastrar = async () => {
     const emailLimpo = normalizarEmail(email);
@@ -53,6 +63,8 @@ export default function AdministradoresScreen() {
     { text: 'Remover', style: 'destructive', onPress: () => deleteDoc(doc(db, 'administradores', item.email)) },
   ]);
 
+  if (!autorizada) return <View style={styles.loading}><Text>Verificando acesso...</Text></View>;
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -77,6 +89,7 @@ export default function AdministradoresScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f5f7fb' },
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f5f7fb' },
   header: { paddingTop: 50, paddingHorizontal: 16, paddingBottom: 14, backgroundColor: '#fff', flexDirection: 'row', alignItems: 'center', gap: 12 },
   back: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#f1f3f4', alignItems: 'center', justifyContent: 'center' },
   backText: { fontSize: 30, lineHeight: 32, color: '#202124' },

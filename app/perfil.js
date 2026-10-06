@@ -138,6 +138,11 @@ export default function Perfil() {
     router.replace('/mapa');
   };
 
+  const trocarConta = async () => {
+    await signOut(auth);
+    router.replace('/email-login');
+  };
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>Perfil</Text>
@@ -170,6 +175,14 @@ export default function Perfil() {
 
       <TouchableOpacity style={styles.secondaryButton} onPress={() => router.push('/endereco')}>
         <Text style={styles.secondaryText}>🏠 Adicionar ou mudar endereço</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity style={styles.secondaryButton} onPress={() => router.push('/familiares')}>
+        <Text style={styles.secondaryText}>⭐ Acompanhar endereço de pessoas</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity style={styles.switchAccountButton} onPress={trocarConta}>
+        <Text style={styles.switchAccountText}>🔄 Trocar de conta</Text>
       </TouchableOpacity>
 
       <TouchableOpacity style={styles.logoutButton} onPress={sair}>

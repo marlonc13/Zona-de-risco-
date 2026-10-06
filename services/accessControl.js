@@ -20,11 +20,19 @@ export async function verificarAdministrador(user) {
   const email = normalizarEmail(user?.email);
   if (!email) return false;
   if (email === ADMIN_PRINCIPAL) return true;
-  const snapshot = await getDoc(doc(db, 'administradores', email));
-  const autorizado = snapshot.exists() && snapshot.data()?.ativo !== false;
-  if (autorizado) adminsConfirmados.add(email);
-  else adminsConfirmados.delete(email);
-  return autorizado;
+  try {
+    const snapshot = await getDoc(doc(db, 'administradores', email));
+    const autorizado = snapshot.exists() && snapshot.data()?.ativo !== false;
+    if (autorizado) adminsConfirmados.add(email);
+    else adminsConfirmados.delete(email);
+    return autorizado;
+  } catch (erro) {
+    // Falha fechada: se o Firestore recusar ou estiver indisponível,
+    // a conta entra como usuário comum, nunca como administrador.
+    console.warn('Não foi possível confirmar o perfil administrativo; entrando como usuário comum.', erro?.code || erro);
+    adminsConfirmados.delete(email);
+    return false;
+  }
 }
 
 export function observarStatusAdministrador(user, callback) {

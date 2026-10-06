@@ -79,11 +79,15 @@ export default function EmailLogin() {
       console.error('Erro no login por e-mail:', error);
       let mensagem = 'Não consegui concluir o login.';
 
-      if (error.code === 'auth/email-already-in-use') mensagem = 'Esse e-mail já tem conta. Troque para "Entrar" em vez de criar conta.';
+      if (error.code === 'auth/email-already-in-use') {
+        mensagem = 'Esse e-mail já tem conta. A tela foi alterada para "Entrar"; use a senha dessa conta.';
+        setModoCadastro(false);
+      }
       if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password') mensagem = 'E-mail ou senha incorretos.';
       if (error.code === 'auth/user-not-found') mensagem = 'Conta não encontrada. Troque para "Criar conta".';
       if (error.code === 'auth/invalid-email') mensagem = 'Digite um e-mail válido.';
       if (error.code === 'auth/operation-not-allowed') mensagem = 'Ative o provedor E-mail/Senha no Firebase Authentication.';
+      if (error.code === 'permission-denied') mensagem = 'A conta foi autenticada, mas o Firebase bloqueou a consulta do perfil. Publique as regras atualizadas do Firestore.';
 
       Alert.alert('Erro', mensagem);
     } finally {

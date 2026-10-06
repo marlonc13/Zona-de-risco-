@@ -45,8 +45,8 @@ export async function solicitarPermissaoNotificacoes() {
   return resposta.granted;
 }
 
-export async function avisarAlertasProximos(localizacao, alertas, enderecoMonitorado = null) {
-  if ((!localizacao && !enderecoMonitorado) || !alertas.length) return;
+export async function avisarAlertasProximos(localizacao, alertas, enderecoMonitorado = null, enderecosFamiliares = []) {
+  if ((!localizacao && !enderecoMonitorado && !enderecosFamiliares.length) || !alertas.length) return;
 
   const Notifications = await carregarNotificacoes();
   if (!Notifications) return;
@@ -64,10 +64,15 @@ export async function avisarAlertasProximos(localizacao, alertas, enderecoMonito
     const distanciaCasa = enderecoMonitorado ? distanciaKm(enderecoMonitorado, alerta) : Infinity;
     const pertoDaLocalizacao = distanciaAtual <= raioKm;
     const pertoDaCasa = distanciaCasa <= raioKm;
+    const familiarProximo = enderecosFamiliares
+      .map(endereco => ({ endereco, distancia: distanciaKm(endereco, alerta) }))
+      .find(item => item.distancia <= raioKm);
 
-    if (pertoDaLocalizacao || pertoDaCasa) {
-      const referencia = pertoDaLocalizacao ? 'da sua localização' : 'da sua residência';
-      const distancia = pertoDaLocalizacao ? distanciaAtual : distanciaCasa;
+    if (pertoDaLocalizacao || pertoDaCasa || familiarProximo) {
+      const referencia = pertoDaLocalizacao
+        ? 'da sua localização'
+        : pertoDaCasa ? 'da sua residência' : `do endereço de ${familiarProximo.endereco.nome}`;
+      const distancia = pertoDaLocalizacao ? distanciaAtual : pertoDaCasa ? distanciaCasa : familiarProximo.distancia;
       await Notifications.scheduleNotificationAsync({
         content: {
           title: `${alerta.gravidade || 'Atenção'}: ${alerta.tipo}`,

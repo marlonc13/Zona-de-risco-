@@ -59,6 +59,16 @@ export default function TabLayout() {
         }}
       />
 
+      <Tabs.Screen
+        name="estatisticas"
+        options={{
+          title: 'Estatísticas',
+          tabBarIcon: () => (
+            <Text style={{ fontSize: 22 }}>📈</Text>
+          ),
+        }}
+      />
+
       
       <Tabs.Screen
         name="lista"

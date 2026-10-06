@@ -22,6 +22,8 @@ const styles = StyleSheet.create({
   buttonText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
   logoutButton: { padding: 14, borderRadius: 14, marginTop: 12, width: '100%', alignItems: 'center', borderWidth: 1, borderColor: '#d93025' },
   logoutText: { color: '#d93025', fontWeight: 'bold' },
+  switchAccountButton: { backgroundColor: '#e8f0fe', padding: 14, borderRadius: 14, marginTop: 14, width: '100%', alignItems: 'center', borderWidth: 1, borderColor: '#1a73e8' },
+  switchAccountText: { color: '#1a73e8', fontWeight: '900' },
 });
 
 export default styles;

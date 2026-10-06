@@ -1,5 +1,5 @@
 import { ActivityIndicator, Image, Linking, ScrollView, Text, TouchableOpacity, View } from 'react-native';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import MapView, { Circle, Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { doc, getFirestore, onSnapshot } from 'firebase/firestore';
@@ -8,6 +8,8 @@ import app, { auth } from '../../services/firebaseConfig';
 import { observarStatusAdministrador } from '../../services/accessControl';
 import { dadosGravidade, formatarRaio, orientacaoDoRisco } from '../../services/riskGuidance';
 import styles from '../../styles/ocorrencia.styles';
+import { STATUS_ALERTA, dadosStatus, statusEfetivo } from '../../services/alertLifecycle';
+import { compartilharAlertaWhatsApp } from '../../services/shareAlert';
 
 const db = getFirestore(app);
 
@@ -48,13 +50,14 @@ export default function OcorrenciaDetalhes() {
     });
   }, [id]);
 
-  const ativa = useMemo(() => ocorrencia && ocorrencia.status !== 'encerrado' && ocorrencia.expiresAt > Date.now(), [ocorrencia]);
-
   if (carregando) return <View style={styles.center}><ActivityIndicator size="large" color="#1a73e8" /></View>;
 
   if (!ocorrencia) return <View style={styles.center}><Text style={styles.notFound}>Esta ocorrência não foi encontrada ou foi excluída.</Text><TouchableOpacity style={styles.backButton} onPress={() => router.back()}><Text style={styles.backButtonText}>Voltar</Text></TouchableOpacity></View>;
 
   const gravidade = dadosGravidade(ocorrencia.gravidade);
+  const statusAtual = statusEfetivo(ocorrencia);
+  const statusDados = dadosStatus(statusAtual);
+  const indiceStatus = STATUS_ALERTA.findIndex(item => item.id === statusAtual);
   const coordenada = { latitude: ocorrencia.latitude, longitude: ocorrencia.longitude };
   const possuiCoordenadas = Number.isFinite(coordenada.latitude) && Number.isFinite(coordenada.longitude);
 
@@ -65,19 +68,32 @@ export default function OcorrenciaDetalhes() {
       <View style={styles.topBar}>
         <TouchableOpacity style={styles.iconButton} onPress={() => router.back()}><Text style={styles.iconButtonText}>‹</Text></TouchableOpacity>
         <Text style={styles.topTitle}>Detalhes da ocorrência</Text>
-        <View style={styles.iconButton} />
+        <TouchableOpacity accessibilityLabel="Compartilhar alerta pelo WhatsApp" style={[styles.iconButton, styles.shareIconButton]} onPress={() => compartilharAlertaWhatsApp(ocorrencia)}><Text style={styles.shareIconText}>↗</Text></TouchableOpacity>
       </View>
 
       {ocorrencia.fotoUrl ? <Image source={{ uri: ocorrencia.fotoUrl }} style={styles.heroImage} /> : <View style={styles.heroPlaceholder}><Text style={styles.heroEmoji}>{EMOJIS[ocorrencia.tipo] || '📍'}</Text><Text style={styles.heroPlaceholderText}>Sem foto anexada</Text></View>}
 
       <View style={styles.mainCard}>
         <View style={styles.badges}>
-          <Text style={[styles.statusBadge, ativa ? styles.activeBadge : styles.closedBadge]}>{ativa ? 'ATIVO' : 'ENCERRADO'}</Text>
+          <Text style={[styles.statusBadge, { color: statusDados.cor, backgroundColor: statusDados.fundo }]}>{statusDados.emoji} {statusDados.label.toUpperCase()}</Text>
           <Text style={styles.officialBadge}>{ocorrencia.oficial === true ? '✓ ALERTA OFICIAL' : 'REGISTRO ANTERIOR'}</Text>
         </View>
         <Text style={styles.type}>{EMOJIS[ocorrencia.tipo] || '📍'} {ocorrencia.tipo}</Text>
         <Text style={[styles.severity, { color: gravidade.cor }]}>{gravidade.emoji} {ocorrencia.gravidade || 'Atenção'}</Text>
         <Text style={styles.description}>{ocorrencia.comentario}</Text>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Ciclo de vida da ocorrência</Text>
+        <Text style={styles.lifecycleHelp}>A situação é atualizada pelos administradores conforme o risco evolui.</Text>
+        {STATUS_ALERTA.map((item, indice) => {
+          const atual = item.id === statusAtual;
+          const concluido = indice < indiceStatus;
+          return <View key={item.id} style={styles.lifecycleItem}>
+            <View style={[styles.lifecycleDot, { backgroundColor: atual || concluido ? item.cor : '#dadce0' }]}><Text style={styles.lifecycleDotText}>{concluido ? '✓' : item.emoji}</Text></View>
+            <View style={{ flex: 1 }}><Text style={[styles.lifecycleLabel, atual && { color: item.cor }]}>{item.label}</Text>{atual && <Text style={styles.lifecycleCurrent}>Estado atual</Text>}</View>
+          </View>;
+        })}
       </View>
 
       <View style={styles.section}>
@@ -123,6 +139,10 @@ export default function OcorrenciaDetalhes() {
           <TouchableOpacity style={styles.routeButton} onPress={abrirRota}><Text style={styles.routeButtonText}>🧭 Abrir rota no Google Maps</Text></TouchableOpacity>
         </View>
       )}
+
+      <TouchableOpacity style={styles.whatsappButton} onPress={() => compartilharAlertaWhatsApp(ocorrencia)}>
+        <Text style={styles.whatsappButtonText}>💬 Compartilhar alerta pelo WhatsApp</Text>
+      </TouchableOpacity>
 
       {administrador && <TouchableOpacity style={styles.adminButton} onPress={() => router.push('/lista')}><Text style={styles.adminButtonText}>⚙️ Gerenciar esta ocorrência</Text></TouchableOpacity>}
     </ScrollView>

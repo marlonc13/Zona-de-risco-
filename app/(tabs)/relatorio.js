@@ -8,6 +8,7 @@ import * as Sharing from 'expo-sharing';
 import app, { auth } from '../../services/firebaseConfig';
 import { observarStatusAdministrador } from '../../services/accessControl';
 import styles from '../../styles/relatorio.styles';
+import { STATUS_ALERTA, dadosStatus, statusEfetivo } from '../../services/alertLifecycle';
 
 const db = getFirestore(app);
 const TIPOS = ['Alagamento', 'Enchente', 'Deslizamento', 'Vendaval', 'Seca', 'Incêndio florestal'];
@@ -21,7 +22,7 @@ const escaparHtml = valor => String(valor ?? '')
   .replaceAll("'", '&#039;');
 
 function estaAtivo(item) {
-  return item.status !== 'encerrado' && item.expiresAt > Date.now();
+  return ['ativo', 'monitoramento'].includes(statusEfetivo(item));
 }
 
 function contarPor(lista, campo, valores) {
@@ -57,6 +58,7 @@ export default function RelatorioScreen() {
     const ativos = alertas.filter(estaAtivo).length;
     const tipos = contarPor(alertas, 'tipo', TIPOS);
     const gravidades = contarPor(alertas, 'gravidade', GRAVIDADES);
+    const estados = STATUS_ALERTA.map(estado => ({ ...estado, total: alertas.filter(item => statusEfetivo(item) === estado.id).length }));
     const bairrosAgrupados = alertas.reduce((total, item) => {
       const bairro = item.bairro?.trim() || 'Não informado';
       total[bairro] = (total[bairro] || 0) + 1;
@@ -65,17 +67,18 @@ export default function RelatorioScreen() {
     const bairros = Object.entries(bairrosAgrupados)
       .map(([nome, total]) => ({ nome, total }))
       .sort((a, b) => b.total - a.total);
-    return { total: alertas.length, ativos, encerrados: alertas.length - ativos, tipos, gravidades, bairros };
+    return { total: alertas.length, ativos, encerrados: alertas.filter(item => statusEfetivo(item) === 'encerrado').length, tipos, gravidades, estados, bairros };
   }, [alertas]);
 
   const criarHtml = () => {
     const dataGeracao = new Date().toLocaleString('pt-BR');
     const linhasTipos = dados.tipos.map(item => `<tr><td>${escaparHtml(item.nome)}</td><td>${item.total}</td></tr>`).join('');
     const linhasGravidades = dados.gravidades.map(item => `<tr><td>${escaparHtml(item.nome)}</td><td>${item.total}</td></tr>`).join('');
+    const linhasEstados = dados.estados.map(item => `<tr><td>${escaparHtml(item.label)}</td><td>${item.total}</td></tr>`).join('');
     const linhasBairros = dados.bairros.map(item => `<tr><td>${escaparHtml(item.nome)}</td><td>${item.total}</td></tr>`).join('');
     const linhasHistorico = [...alertas]
       .sort((a, b) => (b.createdAtMillis || 0) - (a.createdAtMillis || 0))
-      .map(item => `<tr><td>${new Date(item.createdAtMillis || Date.now()).toLocaleDateString('pt-BR')}</td><td>${escaparHtml(item.tipo)}</td><td>${escaparHtml(item.bairro || 'Não informado')}</td><td>${escaparHtml(item.gravidade || 'Atenção')}</td><td>${estaAtivo(item) ? 'Ativo' : 'Encerrado'}</td></tr>`)
+      .map(item => `<tr><td>${new Date(item.createdAtMillis || Date.now()).toLocaleDateString('pt-BR')}</td><td>${escaparHtml(item.tipo)}</td><td>${escaparHtml(item.bairro || 'Não informado')}</td><td>${escaparHtml(item.gravidade || 'Atenção')}</td><td>${escaparHtml(dadosStatus(statusEfetivo(item)).label)}</td></tr>`)
       .join('');
 
     return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><style>
@@ -91,6 +94,7 @@ export default function RelatorioScreen() {
       <div class="cards"><div class="card"><div class="numero">${dados.total}</div>Total de ocorrências</div><div class="card"><div class="numero">${dados.ativos}</div>Ativas</div><div class="card"><div class="numero">${dados.encerrados}</div>Encerradas ou expiradas</div></div>
       <h2>Ocorrências por tipo</h2><table><tr><th>Tipo de risco</th><th>Total</th></tr>${linhasTipos}</table>
       <h2>Ocorrências por gravidade</h2><table><tr><th>Gravidade</th><th>Total</th></tr>${linhasGravidades}</table>
+      <h2>Ciclo de vida</h2><table><tr><th>Estado</th><th>Total</th></tr>${linhasEstados}</table>
       <h2>Ocorrências por bairro</h2><table><tr><th>Bairro</th><th>Total</th></tr>${linhasBairros || '<tr><td colspan="2">Nenhum bairro cadastrado</td></tr>'}</table>
       <h2>Histórico detalhado</h2><table><tr><th>Data</th><th>Tipo</th><th>Bairro</th><th>Gravidade</th><th>Status</th></tr>${linhasHistorico || '<tr><td colspan="5">Nenhuma ocorrência cadastrada</td></tr>'}</table>
       <div class="rodape">Documento gerado pelo aplicativo Zona de Risco. Dados baseados nos registros disponíveis no Firebase no momento da exportação.</div>
@@ -138,6 +142,11 @@ export default function RelatorioScreen() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Por gravidade</Text>
         {dados.gravidades.map(item => <View key={item.nome} style={styles.rowItem}><Text style={styles.rowName}>{item.nome}</Text><Text style={styles.rowTotal}>{item.total}</Text></View>)}
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Ciclo de vida dos alertas</Text>
+        {dados.estados.map(item => <View key={item.id} style={styles.rowItem}><Text style={[styles.rowName, { color: item.cor }]}>{item.emoji} {item.label}</Text><Text style={styles.rowTotal}>{item.total}</Text></View>)}
       </View>
 
       <View style={styles.section}>

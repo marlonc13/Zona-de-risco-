@@ -35,7 +35,13 @@ service cloud.firestore {
     }
 
     match /administradores/{email} {
-      allow read: if ehAdministrador();
+      // Cada conta pode consultar somente o próprio status. A lista completa
+      // continua restrita à administradora principal.
+      allow get: if estaLogado() && (
+        request.auth.token.email == email
+        || request.auth.token.email == 'alinelasneau@gmail.com'
+      );
+      allow list: if ehAdministradorPrincipal();
       allow create, update, delete: if ehAdministradorPrincipal();
     }
   }

@@ -1,7 +1,7 @@
 import { View, Text, TouchableOpacity, Alert, ScrollView, Modal, TextInput, Image, Linking } from 'react-native';
 import MapView, { Marker, Circle, Heatmap, PROVIDER_GOOGLE, Callout } from 'react-native-maps';
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
@@ -14,6 +14,8 @@ import { GRAVIDADES, RAIOS_ALERTA, dadosGravidade, formatarRaio, orientacaoDoRis
 import { buscarClimaAtual } from '../../services/weatherService';
 import { CHECKLIST_EVACUACAO, CONTATOS_EMERGENCIA, INSTRUCOES_EVACUACAO } from '../../services/emergencyGuidance';
 import { uploadImage } from '../../services/imageUpload';
+import { apareceNoMapa, statusEfetivo } from '../../services/alertLifecycle';
+import { compartilharAlertaWhatsApp } from '../../services/shareAlert';
 
 const db = getFirestore(app);
 const auth = getAuth(app);
@@ -54,6 +56,7 @@ function comTimeout(promise, ms = 25000) {
 
 export default function MapScreen() {
   const router = useRouter();
+  const parametros = useLocalSearchParams();
   const mapRef = useRef(null);
   const emergenciasExibidas = useRef(new Set());
 
@@ -76,10 +79,13 @@ export default function MapScreen() {
   const [gravidadeSelecionada, setGravidadeSelecionada] = useState('Atenção');
   const [raioSelecionado, setRaioSelecionado] = useState(1000);
   const [enderecoMonitorado, setEnderecoMonitorado] = useState(null);
+  const [enderecosFamiliares, setEnderecosFamiliares] = useState([]);
   const [clima, setClima] = useState(null);
   const [modalEmergenciaVisivel, setModalEmergenciaVisivel] = useState(false);
   const [alertaEmergencia, setAlertaEmergencia] = useState(null);
   const [administrador, setAdministrador] = useState(false);
+  const [alertaSelecionado, setAlertaSelecionado] = useState(null);
+  const [modalContatosVisivel, setModalContatosVisivel] = useState(false);
 
   useEffect(() => {
     let pararAdmin = () => {};
@@ -92,11 +98,17 @@ export default function MapScreen() {
   }, []);
 
   useEffect(() => {
+    if (parametros.calor === '1') setMapaCalorAtivo(true);
+  }, [parametros.calor]);
+
+  useEffect(() => {
     setEnderecoMonitorado(null);
+    setEnderecosFamiliares([]);
     if (!usuario) return undefined;
 
     const unsubscribeEndereco = onSnapshot(doc(db, 'usuarios', usuario.uid), snapshot => {
       const endereco = snapshot.data()?.endereco;
+      setEnderecosFamiliares((snapshot.data()?.enderecosFamiliares || []).slice(0, 5));
       if (endereco?.latitude && endereco?.longitude) {
         setEnderecoMonitorado({
           latitude: endereco.latitude,
@@ -144,20 +156,19 @@ export default function MapScreen() {
 
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, 'marcacoes'), snapshot => {
-      const agora = Date.now();
       const dados = snapshot.docs
         .map(doc => ({ id: doc.id, ...doc.data() }));
       setHistoricoAlertas(dados);
       const ativos = dados
-        .filter(item => item.status !== 'encerrado' && item.expiresAt && item.expiresAt > agora);
+        .filter(item => apareceNoMapa(item));
       setAlertas(ativos);
     }, erro => console.error('Erro ao carregar alertas:', erro));
     return () => unsubscribe();
   }, []);
 
   useEffect(() => {
-    avisarAlertasProximos(localizacao, alertas, enderecoMonitorado).catch(erro => console.error('Erro nas notificações:', erro));
-  }, [localizacao, alertas, enderecoMonitorado]);
+    avisarAlertasProximos(localizacao, alertas, enderecoMonitorado, enderecosFamiliares).catch(erro => console.error('Erro nas notificações:', erro));
+  }, [localizacao, alertas, enderecoMonitorado, enderecosFamiliares]);
 
   useEffect(() => {
     if (!localizacao) return;
@@ -171,13 +182,18 @@ export default function MapScreen() {
     return alertas.filter(alerta => distanciaKm(enderecoMonitorado, alerta) <= (alerta.raioMetros || 1000) / 1000);
   }, [alertas, enderecoMonitorado]);
 
+  const alertasPertoFamilia = useMemo(() => enderecosFamiliares.flatMap(endereco => alertas
+    .filter(alerta => distanciaKm(endereco, alerta) <= (alerta.raioMetros || 1000) / 1000)
+    .map(alerta => ({ alerta, endereco }))), [alertas, enderecosFamiliares]);
+
   const emergenciasProximas = useMemo(() => alertas.filter(alerta => {
     if (alerta.gravidade !== 'Emergência') return false;
     const raioKm = (alerta.raioMetros || 1000) / 1000;
     const atingeLocalizacao = localizacao && distanciaKm(localizacao, alerta) <= raioKm;
     const atingeResidencia = enderecoMonitorado && distanciaKm(enderecoMonitorado, alerta) <= raioKm;
-    return atingeLocalizacao || atingeResidencia;
-  }), [alertas, localizacao, enderecoMonitorado]);
+    const atingeFamiliar = enderecosFamiliares.some(endereco => distanciaKm(endereco, alerta) <= raioKm);
+    return atingeLocalizacao || atingeResidencia || atingeFamiliar;
+  }), [alertas, localizacao, enderecoMonitorado, enderecosFamiliares]);
 
   useEffect(() => {
     const emergencia = emergenciasProximas[0];
@@ -200,11 +216,12 @@ export default function MapScreen() {
   }, [alertas, filtroAtivo]);
 
   const pontosMapaCalor = useMemo(() => historicoAlertas
-    .filter(item => Number.isFinite(item.latitude) && Number.isFinite(item.longitude))
+    .filter(item => statusEfetivo(item) !== 'rascunho')
+    .filter(item => Number.isFinite(Number(item.latitude)) && Number.isFinite(Number(item.longitude)))
     .filter(item => filtroAtivo === 'Todos' || item.tipo === filtroAtivo)
     .map(item => ({
-      latitude: item.latitude,
-      longitude: item.longitude,
+      latitude: Number(item.latitude),
+      longitude: Number(item.longitude),
       weight: 1,
     })), [historicoAlertas, filtroAtivo]);
 
@@ -278,7 +295,7 @@ export default function MapScreen() {
     if (!result.canceled) setFoto(result.assets[0].uri);
   };
 
-  const salvarMarcacao = async () => {
+  const salvarMarcacao = async (statusInicial = 'ativo') => {
     if (salvando) return;
     const userAtual = auth.currentUser || usuario;
     const texto = comentario.trim();
@@ -320,6 +337,7 @@ export default function MapScreen() {
         fotoUrl = await uploadImage(foto, `ocorrencias/${userAtual.uid}/${agora}.jpg`);
       }
 
+      const rascunho = statusInicial === 'rascunho';
       await comTimeout(addDoc(collection(db, 'marcacoes'), {
         latitude: coordenadaSelecionada.latitude,
         longitude: coordenadaSelecionada.longitude,
@@ -335,13 +353,14 @@ export default function MapScreen() {
         createdAtMillis: agora,
         updatedAt: serverTimestamp(),
         updatedAtMillis: agora,
-        expiresAt: agora + duracaoAlerta,
-        status: 'ativo',
-        oficial: true,
+        expiresAt: rascunho ? null : agora + duracaoAlerta,
+        duracaoMillis: duracaoAlerta,
+        status: statusInicial,
+        oficial: !rascunho,
         adminEmail: userAtual.email,
         criadoPor: userAtual.email,
         historicoAdministrativo: [{
-          acao: 'Criou o alerta',
+          acao: rascunho ? 'Salvou a ocorrência como rascunho' : 'Criou e publicou o alerta',
           adminEmail: userAtual.email,
           adminNome: userAtual.displayName || 'Administrador',
           dataMillis: agora,
@@ -349,7 +368,7 @@ export default function MapScreen() {
       }), 15000);
 
       setModalVisivel(false);
-      Alert.alert('Sucesso', 'Alerta adicionado ao mapa!');
+      Alert.alert(rascunho ? 'Rascunho salvo' : 'Sucesso', rascunho ? 'A ocorrência ficou disponível apenas no painel administrativo.' : 'Alerta adicionado ao mapa!');
     } catch (erro) {
       console.error("Erro detalhado do Firebase:", erro);
       Alert.alert('Erro ao Salvar', 'Não foi possível salvar o alerta. Verifique a internet e as regras do Firestore.');
@@ -407,7 +426,7 @@ export default function MapScreen() {
           />
         ))}
         {!mapaCalorAtivo && alertasFiltrados.map(item => (
-          <Marker key={item.id} coordinate={{ latitude: item.latitude, longitude: item.longitude }} pinColor={dadosGravidade(item.gravidade).cor}>
+          <Marker key={item.id} coordinate={{ latitude: item.latitude, longitude: item.longitude }} pinColor={dadosGravidade(item.gravidade).cor} onPress={() => setAlertaSelecionado(item)}>
             <Callout tooltip onPress={() => router.push(`/ocorrencia/${item.id}`)}>
               <View style={styles.callout}>
                 <Text style={styles.calloutTitle}>{emojiDoTipo(item.tipo)} {item.tipo}</Text>
@@ -432,6 +451,9 @@ export default function MapScreen() {
         {enderecoMonitorado && (
           <Marker coordinate={enderecoMonitorado} title="Residência monitorada" description="Você receberá avisos de riscos nesta área" pinColor="#1a73e8" />
         )}
+        {enderecosFamiliares.map(endereco => (
+          <Marker key={`pessoa-${endereco.id}`} coordinate={{ latitude: endereco.latitude, longitude: endereco.longitude }} title={endereco.nome} description="Endereço acompanhado" pinColor={endereco.cor || '#7b1fa2'} />
+        ))}
       </MapView>
 
       <View style={styles.searchBox}>
@@ -444,17 +466,22 @@ export default function MapScreen() {
             {administrador ? 'Modo administrador: publique ocorrências' : usuario ? 'Alertas naturais próximos de você' : 'Modo visitante: somente consulta'}
           </Text>
         </View>
+        <TouchableOpacity accessibilityLabel="Abrir contatos de emergência" style={styles.sosHeaderButton} onPress={() => setModalContatosVisivel(true)}>
+          <Text style={styles.sosHeaderText}>SOS</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          accessibilityLabel={mapaCalorAtivo ? 'Desativar mapa de calor' : 'Ativar mapa de calor'}
+          style={[styles.heatmapHeaderButton, mapaCalorAtivo && styles.heatmapHeaderButtonActive]}
+          onPress={() => setMapaCalorAtivo(atual => !atual)}
+        >
+          <Text style={styles.heatmapHeaderText}>🔥</Text>
+        </TouchableOpacity>
         <TouchableOpacity onPress={() => router.push('/config')}>
           <Text style={styles.config}>⚙️</Text>
         </TouchableOpacity>
       </View>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterBar}>
-        {administrador && (
-          <TouchableOpacity onPress={() => setMapaCalorAtivo(atual => !atual)} style={[styles.chip, mapaCalorAtivo && styles.heatmapChipActive]}>
-            <Text style={[styles.chipText, mapaCalorAtivo && { color: '#fff' }]}>🔥 Mapa de calor</Text>
-          </TouchableOpacity>
-        )}
         {TIPOS_ALERTA.map(tipo => (
           <TouchableOpacity key={tipo.label} onPress={() => setFiltroAtivo(tipo.label)} style={[styles.chip, filtroAtivo === tipo.label && { backgroundColor: tipo.cor }]}>
             <Text style={[styles.chipText, filtroAtivo === tipo.label && { color: '#fff' }]}>{tipo.emoji} {tipo.label}</Text>
@@ -462,7 +489,7 @@ export default function MapScreen() {
         ))}
       </ScrollView>
 
-      {administrador && mapaCalorAtivo && (
+      {mapaCalorAtivo && (
         <View style={styles.heatmapLegend}>
           <Text style={styles.heatmapLegendTitle}>Concentração histórica</Text>
           <View style={styles.heatmapGradient}>
@@ -486,6 +513,12 @@ export default function MapScreen() {
         </TouchableOpacity>
       )}
 
+      {alertasPertoCasa.length === 0 && alertasPertoFamilia.length > 0 && (
+        <TouchableOpacity style={styles.familyWarning} onPress={() => router.push('/familiares')}>
+          <Text style={styles.familyWarningText}>👥 {alertasPertoFamilia.length} alerta(s) perto de pessoas acompanhadas</Text>
+        </TouchableOpacity>
+      )}
+
       {alertaEmergencia && (
         <TouchableOpacity style={styles.emergencyBanner} onPress={() => setModalEmergenciaVisivel(true)}>
           <Text style={styles.emergencyBannerTitle}>🔴 EMERGÊNCIA NA SUA ÁREA</Text>
@@ -498,6 +531,19 @@ export default function MapScreen() {
           <Text style={styles.weatherTitle}>🌤️ {clima.descricao} · {Math.round(clima.temperatura)}°C</Text>
           <Text style={styles.weatherText}>Chuva {clima.chuva ?? 0} mm · Vento {Math.round(clima.vento ?? 0)} km/h</Text>
           <Text style={styles.weatherSource}>Open-Meteo · dados auxiliares</Text>
+        </View>
+      )}
+
+      {alertaSelecionado && (
+        <View style={styles.shareAlertBox}>
+          <View style={styles.shareAlertInfo}>
+            <Text style={styles.shareAlertTitle}>{emojiDoTipo(alertaSelecionado.tipo)} {alertaSelecionado.tipo}</Text>
+            <Text style={styles.shareAlertSubtitle}>{alertaSelecionado.bairro || alertaSelecionado.gravidade || 'Alerta selecionado'}</Text>
+          </View>
+          <TouchableOpacity style={styles.mapWhatsAppButton} onPress={() => compartilharAlertaWhatsApp(alertaSelecionado)}>
+            <Text style={styles.mapWhatsAppText}>💬 WhatsApp</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.shareAlertClose} onPress={() => setAlertaSelecionado(null)}><Text style={styles.shareAlertCloseText}>✕</Text></TouchableOpacity>
         </View>
       )}
 
@@ -620,8 +666,11 @@ export default function MapScreen() {
               <TouchableOpacity style={[styles.modalButton, styles.cancelButton]} onPress={() => setModalVisivel(false)} disabled={salvando}>
                 <Text style={styles.cancelText}>Cancelar</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.modalButton, styles.saveButton]} onPress={salvarMarcacao} disabled={salvando}>
-                <Text style={styles.saveText}>{salvando ? 'Publicando...' : 'Publicar'}</Text>
+              <TouchableOpacity style={[styles.modalButton, styles.draftButton]} onPress={() => salvarMarcacao('rascunho')} disabled={salvando}>
+                <Text style={styles.draftText}>Salvar rascunho</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.modalButton, styles.saveButton]} onPress={() => salvarMarcacao('ativo')} disabled={salvando}>
+                <Text style={styles.saveText}>{salvando ? 'Salvando...' : 'Publicar'}</Text>
               </TouchableOpacity>
             </View>
             </ScrollView>
@@ -644,6 +693,10 @@ export default function MapScreen() {
               </View>
 
               {!!alertaEmergencia?.comentario && <Text style={styles.emergencyDescription}>{alertaEmergencia.comentario}</Text>}
+
+              <TouchableOpacity style={styles.emergencyShareButton} onPress={() => compartilharAlertaWhatsApp(alertaEmergencia)}>
+                <Text style={styles.emergencyShareText}>💬 Compartilhar este alerta no WhatsApp</Text>
+              </TouchableOpacity>
 
               <Text style={styles.emergencySectionTitle}>O que fazer agora</Text>
               {INSTRUCOES_EVACUACAO.map((instrucao, indice) => (
@@ -674,6 +727,24 @@ export default function MapScreen() {
                 <Text style={styles.shelterButtonText}>🏠 Ver abrigos e pontos seguros</Text>
               </TouchableOpacity>
             </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={modalContatosVisivel} transparent animationType="fade" onRequestClose={() => setModalContatosVisivel(false)}>
+        <View style={styles.contactsOverlay}>
+          <View style={styles.contactsModal}>
+            <View style={styles.contactsHeader}>
+              <View style={{ flex: 1 }}><Text style={styles.contactsTitle}>🆘 Contatos de emergência</Text><Text style={styles.contactsSubtitle}>Escolha um serviço para abrir o número no discador.</Text></View>
+              <TouchableOpacity style={styles.emergencyClose} onPress={() => setModalContatosVisivel(false)}><Text style={styles.emergencyCloseText}>✕</Text></TouchableOpacity>
+            </View>
+            {CONTATOS_EMERGENCIA.map(contato => (
+              <TouchableOpacity key={contato.numero} style={styles.dialButton} onPress={() => Linking.openURL(`tel:${contato.numero}`)}>
+                <View><Text style={styles.dialName}>{contato.emoji} {contato.nome}</Text><Text style={styles.dialHint}>Abrir no discador</Text></View>
+                <Text style={styles.dialNumber}>{contato.numero}</Text>
+              </TouchableOpacity>
+            ))}
+            <Text style={styles.dialNotice}>O aplicativo apenas preenche o número. Você confirma a chamada no telefone.</Text>
           </View>
         </View>
       </Modal>
