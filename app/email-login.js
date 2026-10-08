@@ -154,10 +154,6 @@ export default function EmailLogin() {
           <Text style={styles.linkText}>{modoCadastro ? 'Já tenho conta' : 'Não tenho conta, criar agora'}</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.visitanteButton} onPress={() => router.replace('/mapa')} disabled={carregando}>
-          <Text style={styles.visitanteText}>Continuar como visitante</Text>
-        </TouchableOpacity>
-
         <TouchableOpacity style={styles.voltarButton} onPress={() => router.replace('/inicio')} disabled={carregando}>
           <Text style={styles.voltarText}>Voltar</Text>
         </TouchableOpacity>

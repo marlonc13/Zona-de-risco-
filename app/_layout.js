@@ -9,6 +9,7 @@ function RootLayoutContent() {
     <>
       <Stack initialRouteName="index">
         <Stack.Screen name="index" options={{ headerShown: false }} />
+        <Stack.Screen name="inicio" options={{ title: 'Inicio' }} />
         <Stack.Screen name="login" options={{ headerShown: false }} />
         <Stack.Screen name="email-login" options={{ headerShown: false }} />
         <Stack.Screen name="admin" options={{ headerShown: false }} />
