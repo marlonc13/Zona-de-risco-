@@ -3,36 +3,53 @@ import { useState, useEffect } from 'react';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import app from '../services/firebaseConfig';
-import { getAuth, updateProfile, updatePassword, signOut } from 'firebase/auth';
-import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { EmailAuthProvider, getAuth, onAuthStateChanged, reauthenticateWithCredential, signOut, updatePassword, updateProfile } from 'firebase/auth';
+import { doc, getDoc, getFirestore, serverTimestamp, setDoc } from 'firebase/firestore';
 import styles from '../styles/perfil.styles';
+import { observarStatusAdministrador } from '../services/accessControl';
+import { uploadImage } from '../services/imageUpload';
 
 const auth = getAuth(app);
-const storage = getStorage(app);
-
-async function uriParaBlob(uri) {
-  const response = await fetch(uri);
-  return await response.blob();
-}
-
+const db = getFirestore(app);
 export default function Perfil() {
   const router = useRouter();
   const [nome, setNome] = useState('');
   const [email, setEmail] = useState('');
-  const [senha, setSenha] = useState('');
+  const [senhaAtual, setSenhaAtual] = useState('');
+  const [novaSenha, setNovaSenha] = useState('');
+  const [confirmarSenha, setConfirmarSenha] = useState('');
+  const [mostrarSenhas, setMostrarSenhas] = useState(false);
   const [foto, setFoto] = useState(null);
-  const [salvando, setSalvando] = useState(false);
+  const [salvandoPerfil, setSalvandoPerfil] = useState(false);
+  const [salvandoSenha, setSalvandoSenha] = useState(false);
+  const [administrador, setAdministrador] = useState(false);
+
+  useEffect(() => {
+    let pararAdmin = () => {};
+    const pararAuth = onAuthStateChanged(auth, user => {
+      pararAdmin();
+      pararAdmin = observarStatusAdministrador(user, setAdministrador);
+    });
+    return () => { pararAuth(); pararAdmin(); };
+  }, []);
 
   useEffect(() => {
     const user = auth.currentUser;
     if (!user) {
-      router.replace('/login');
+      router.replace('/email-login');
       return;
     }
     setNome(user.displayName || '');
     setEmail(user.email || '');
     setFoto(user.photoURL || null);
-  }, []);
+    getDoc(doc(db, 'usuarios', user.uid))
+      .then(snapshot => {
+        if (snapshot.exists() && snapshot.data()?.photoUrl) {
+          setFoto(snapshot.data().photoUrl);
+        }
+      })
+      .catch(error => console.warn('Não foi possível carregar a foto do perfil:', error));
+  }, [router]);
 
   const escolherFoto = async () => {
     const permissao = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -41,8 +58,8 @@ export default function Perfil() {
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync
-    ({ mediaTypes: ImagePicker.MediaTypeOptions.Images, 
-      quality: 0.7, allowsEditing: true, aspect: [1, 1] });
+    ({ mediaTypes: ['images'],
+      quality: 0.2, allowsEditing: true, aspect: [1, 1] });
     if (!result.canceled) setFoto(result.assets[0].uri);
   };
 
@@ -52,48 +69,78 @@ export default function Perfil() {
       Alert.alert('Permissão necessária', 'Permita acesso à câmera.');
       return;
     }
-    const result = await ImagePicker.launchCameraAsync({ quality: 0.7, allowsEditing: true, aspect: [1, 1] });
+    const result = await ImagePicker.launchCameraAsync({ quality: 0.2, allowsEditing: true, aspect: [1, 1] });
     if (!result.canceled) setFoto(result.assets[0].uri);
   };
 
-  const salvar = async () => {
+  const salvarPerfil = async () => {
     const user = auth.currentUser;
     if (!user) return;
 
     try {
-      setSalvando(true);
-      let photoURL = user.photoURL;
+      setSalvandoPerfil(true);
+      let photoUrl = foto;
 
-      if (foto && foto !== user.photoURL) {
-        const blob = await uriParaBlob(foto);
-        const storageRef = ref(storage, `usuarios/${user.uid}/perfil.jpg`);
-        await uploadBytes(storageRef, blob);
-        photoURL = await getDownloadURL(storageRef);
+      if (foto && !foto.startsWith('http') && !foto.startsWith('data:')) {
+        photoUrl = await uploadImage(foto);
       }
 
-      await updateProfile(user, { displayName: nome.trim() || 'Usuário', photoURL });
-
-      if (senha.trim().length > 0) {
-        if (senha.trim().length < 6) {
-          Alert.alert('Senha fraca', 'A senha precisa ter pelo menos 6 caracteres.');
-          return;
-        }
-        await updatePassword(user, senha.trim());
-        setSenha('');
-      }
-
-      Alert.alert('Sucesso', 'Perfil atualizado.');
+      const nomeFinal = nome.trim() || 'Usuário';
+      await updateProfile(user, { displayName: nomeFinal });
+      await setDoc(doc(db, 'usuarios', user.uid), {
+        nome: nomeFinal,
+        email: user.email,
+        photoUrl: photoUrl || null,
+        atualizadoEm: serverTimestamp(),
+      }, { merge: true });
+      setFoto(photoUrl || null);
+      Alert.alert('Sucesso', 'Nome e foto atualizados.');
     } catch (error) {
       console.error('Erro ao atualizar perfil:', error);
-      Alert.alert('Erro', 'Não consegui atualizar. Para trocar senha, talvez seja necessário fazer login novamente.');
+      let mensagem = `Não foi possível salvar a foto. Código: ${error.code || 'desconhecido'}.`;
+      if (error.code === 'permission-denied') mensagem = 'O Firebase bloqueou a atualização do perfil. Confira as regras da coleção usuarios.';
+      Alert.alert('Erro', mensagem);
     } finally {
-      setSalvando(false);
+      setSalvandoPerfil(false);
+    }
+  };
+
+  const alterarSenha = async () => {
+    const user = auth.currentUser;
+    if (!user) return;
+    if (!senhaAtual || !novaSenha || !confirmarSenha) return Alert.alert('Campos obrigatórios', 'Preencha a senha atual, a nova senha e a confirmação.');
+    if (novaSenha.length < 6) return Alert.alert('Senha fraca', 'A nova senha precisa ter pelo menos 6 caracteres.');
+    if (novaSenha !== confirmarSenha) return Alert.alert('Senhas diferentes', 'A confirmação precisa ser igual à nova senha.');
+
+    try {
+      setSalvandoSenha(true);
+      const credencial = EmailAuthProvider.credential(user.email, senhaAtual);
+      await reauthenticateWithCredential(user, credencial);
+      await updatePassword(user, novaSenha);
+      setSenhaAtual('');
+      setNovaSenha('');
+      setConfirmarSenha('');
+      setMostrarSenhas(false);
+      Alert.alert('Senha alterada', 'Sua senha foi atualizada com sucesso.');
+    } catch (error) {
+      console.error('Erro ao alterar senha:', error);
+      let mensagem = `Não foi possível alterar a senha. Código: ${error.code || 'desconhecido'}.`;
+      if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password') mensagem = 'A senha atual está incorreta.';
+      if (error.code === 'auth/weak-password') mensagem = 'A nova senha precisa ter pelo menos 6 caracteres.';
+      Alert.alert('Erro', mensagem);
+    } finally {
+      setSalvandoSenha(false);
     }
   };
 
   const sair = async () => {
     await signOut(auth);
     router.replace('/mapa');
+  };
+
+  const trocarConta = async () => {
+    await signOut(auth);
+    router.replace('/email-login');
   };
 
   return (
@@ -110,10 +157,32 @@ export default function Perfil() {
 
       <TextInput style={styles.input} placeholder="Nome" value={nome} onChangeText={setNome} />
       <TextInput style={[styles.input, styles.disabled]} placeholder="Email" value={email} editable={false} />
-      <TextInput style={styles.input} placeholder="Nova senha (opcional)" secureTextEntry value={senha} onChangeText={setSenha} />
+      <Text style={{ color: administrador ? '#d93025' : '#5f6368', fontWeight: '800', marginBottom: 12 }}>
+        Perfil: {administrador ? 'Administrador' : 'Usuário'}
+      </Text>
+      <TouchableOpacity style={styles.button} onPress={salvarPerfil} disabled={salvandoPerfil}>
+        <Text style={styles.buttonText}>{salvandoPerfil ? 'Salvando perfil...' : 'Salvar nome e foto'}</Text>
+      </TouchableOpacity>
 
-      <TouchableOpacity style={styles.button} onPress={salvar} disabled={salvando}>
-        <Text style={styles.buttonText}>{salvando ? 'Salvando...' : 'Salvar alterações'}</Text>
+      <Text style={styles.passwordTitle}>Alterar senha (opcional)</Text>
+      <View style={styles.passwordBox}><TextInput style={styles.passwordInput} placeholder="Senha atual" secureTextEntry={!mostrarSenhas} value={senhaAtual} onChangeText={setSenhaAtual} /><TouchableOpacity style={styles.eyeButton} onPress={() => setMostrarSenhas(atual => !atual)}><Text style={styles.eyeText}>{mostrarSenhas ? '🙈' : '👁️'}</Text></TouchableOpacity></View>
+      <TextInput style={styles.input} placeholder="Nova senha" secureTextEntry={!mostrarSenhas} value={novaSenha} onChangeText={setNovaSenha} />
+      <TextInput style={styles.input} placeholder="Confirmar nova senha" secureTextEntry={!mostrarSenhas} value={confirmarSenha} onChangeText={setConfirmarSenha} />
+
+      <TouchableOpacity style={styles.passwordButton} onPress={alterarSenha} disabled={salvandoSenha}>
+        <Text style={styles.passwordButtonText}>{salvandoSenha ? 'Alterando senha...' : 'Alterar senha'}</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity style={styles.secondaryButton} onPress={() => router.push('/endereco')}>
+        <Text style={styles.secondaryText}>🏠 Adicionar ou mudar endereço</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity style={styles.secondaryButton} onPress={() => router.push('/familiares')}>
+        <Text style={styles.secondaryText}>⭐ Acompanhar endereço de pessoas</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity style={styles.switchAccountButton} onPress={trocarConta}>
+        <Text style={styles.switchAccountText}>🔄 Trocar de conta</Text>
       </TouchableOpacity>
 
       <TouchableOpacity style={styles.logoutButton} onPress={sair}>

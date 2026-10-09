@@ -6,6 +6,7 @@ import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfi
 import { auth } from '../services/firebaseConfig';
 import { authenticateWithBiometrics } from '../services/biometricAuth';
 import styles from '../styles/email-login.styles';
+import { verificarAdministrador } from '../services/accessControl';
 
 export default function EmailLogin() {
   const router = useRouter();
@@ -13,6 +14,7 @@ export default function EmailLogin() {
   const [nome, setNome] = useState('');
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
+  const [mostrarSenha, setMostrarSenha] = useState(false);
   const [carregando, setCarregando] = useState(false);
 
   const entrarNoApp = async (user) => {
@@ -21,16 +23,19 @@ export default function EmailLogin() {
     await AsyncStorage.setItem('userEmail', user.email || email.trim());
     await AsyncStorage.setItem('biometriaAtiva', 'true');
 
-    const resultado = await authenticateWithBiometrics();
+    const [resultado, administrador] = await Promise.all([
+      authenticateWithBiometrics(),
+      verificarAdministrador(user),
+    ]);
 
     if (resultado?.success) {
-      router.replace('/mapa');
+      router.replace(administrador ? '/admin' : '/mapa');
       return;
     }
 
     if (resultado?.message === 'Sem suporte a biometria' || resultado?.message === 'Cadastre biometria no celular') {
       Alert.alert('Biometria não disponível', 'O login foi feito. Cadastre biometria no celular para usar essa proteção nas próximas entradas.');
-      router.replace('/mapa');
+      router.replace(administrador ? '/admin' : '/mapa');
       return;
     }
 
@@ -74,11 +79,15 @@ export default function EmailLogin() {
       console.error('Erro no login por e-mail:', error);
       let mensagem = 'Não consegui concluir o login.';
 
-      if (error.code === 'auth/email-already-in-use') mensagem = 'Esse e-mail já tem conta. Troque para "Entrar" em vez de criar conta.';
+      if (error.code === 'auth/email-already-in-use') {
+        mensagem = 'Esse e-mail já tem conta. A tela foi alterada para "Entrar"; use a senha dessa conta.';
+        setModoCadastro(false);
+      }
       if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password') mensagem = 'E-mail ou senha incorretos.';
       if (error.code === 'auth/user-not-found') mensagem = 'Conta não encontrada. Troque para "Criar conta".';
-      if (error.code === 'auth/invalid-email') messaging = 'Digite um e-mail válido.';
+      if (error.code === 'auth/invalid-email') mensagem = 'Digite um e-mail válido.';
       if (error.code === 'auth/operation-not-allowed') mensagem = 'Ative o provedor E-mail/Senha no Firebase Authentication.';
+      if (error.code === 'permission-denied') mensagem = 'A conta foi autenticada, mas o Firebase bloqueou a consulta do perfil. Publique as regras atualizadas do Firestore.';
 
       Alert.alert('Erro', mensagem);
     } finally {
@@ -123,14 +132,19 @@ export default function EmailLogin() {
           keyboardType="email-address"
         />
 
-        <TextInput
-          style={styles.input}
-          placeholder="Senha"
-          placeholderTextColor="#777"
-          value={senha}
-          onChangeText={setSenha}
-          secureTextEntry
-        />
+        <View style={styles.passwordBox}>
+          <TextInput
+            style={styles.passwordInput}
+            placeholder="Senha"
+            placeholderTextColor="#777"
+            value={senha}
+            onChangeText={setSenha}
+            secureTextEntry={!mostrarSenha}
+          />
+          <TouchableOpacity style={styles.eyeButton} onPress={() => setMostrarSenha(atual => !atual)}>
+            <Text style={styles.eyeText}>{mostrarSenha ? '🙈' : '👁️'}</Text>
+          </TouchableOpacity>
+        </View>
 
         <TouchableOpacity style={styles.button} onPress={enviar} disabled={carregando}>
           {carregando ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>{modoCadastro ? 'Criar e entrar' : 'Entrar com senha'}</Text>}
@@ -144,7 +158,7 @@ export default function EmailLogin() {
           <Text style={styles.visitanteText}>Continuar como visitante</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.voltarButton} onPress={() => router.replace('/login')} disabled={carregando}>
+        <TouchableOpacity style={styles.voltarButton} onPress={() => router.replace('/inicio')} disabled={carregando}>
           <Text style={styles.voltarText}>Voltar</Text>
         </TouchableOpacity>
       </KeyboardAvoidingView>

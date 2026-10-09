@@ -100,6 +100,15 @@ export default function Config() {
       <Text style={[styles.title, { color: cores.text }]}>Configurações</Text>
 
       <View style={styles.optionsContainer}>
+        {auth.currentUser && (
+          <TouchableOpacity style={[styles.optionCard, { backgroundColor: cores.card }]} onPress={() => router.push('/endereco')}>
+            <View style={styles.optionTextArea}>
+              <Text style={[styles.label, { color: cores.text, fontSize: tamanhoFonte }]}>Minha residência</Text>
+              <Text style={[styles.description, { color: cores.text }]}>Adicionar ou alterar o endereço cadastrado.</Text>
+            </View>
+            <Text style={{ fontSize: 24 }}>🏠</Text>
+          </TouchableOpacity>
+        )}
         <View style={[styles.optionCard, { backgroundColor: cores.card }]}> 
           <View style={styles.optionTextArea}>
             <Text style={[styles.label, { color: cores.text, fontSize: tamanhoFonte }]}>Modo escuro</Text>

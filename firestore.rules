@@ -1,0 +1,48 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function estaLogado() {
+      return request.auth != null;
+    }
+
+    function ehAdministrador() {
+      return estaLogado() && (
+        request.auth.token.email == 'alinelasneau@gmail.com'
+        || (exists(/databases/$(database)/documents/administradores/$(request.auth.token.email))
+          && get(/databases/$(database)/documents/administradores/$(request.auth.token.email)).data.ativo == true)
+      );
+    }
+
+    function ehAdministradorPrincipal() {
+      return estaLogado()
+        && request.auth.token.email == 'alinelasneau@gmail.com';
+    }
+
+    match /marcacoes/{marcacaoId} {
+      allow read: if true;
+      allow create, update, delete: if ehAdministrador();
+    }
+
+    match /abrigos/{abrigoId} {
+      allow read: if true;
+      allow create, update, delete: if ehAdministrador();
+    }
+
+    match /usuarios/{usuarioId} {
+      allow read, create, update, delete: if estaLogado()
+        && request.auth.uid == usuarioId;
+    }
+
+    match /administradores/{email} {
+      // Cada conta pode consultar somente o próprio status. A lista completa
+      // continua restrita à administradora principal.
+      allow get: if estaLogado() && (
+        request.auth.token.email == email
+        || request.auth.token.email == 'alinelasneau@gmail.com'
+      );
+      allow list: if ehAdministradorPrincipal();
+      allow create, update, delete: if ehAdministradorPrincipal();
+    }
+  }
+}
