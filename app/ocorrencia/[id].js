@@ -1,7 +1,7 @@
 import { ActivityIndicator, Image, Linking, ScrollView, Text, TouchableOpacity, View } from 'react-native';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import MapView, { Circle, Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import Mapbox from '@rnmapbox/maps';
 import { doc, getFirestore, onSnapshot } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import app, { auth } from '../../services/firebaseConfig';
@@ -21,6 +21,31 @@ const EMOJIS = {
 function formatarData(valor) {
   if (!valor) return 'Não informado';
   return new Date(valor).toLocaleString('pt-BR');
+}
+
+// Função para gerar um círculo em metros no Mapbox
+function gerarCirculoGeoJSON(centroLong, centroLat, raioMetros, id, corHex) {
+  const coords = [];
+  const raioTerra = 6378137;
+  for (let i = 0; i <= 64; i++) {
+    const angulo = (i * 360) / 64;
+    const theta = angulo * (Math.PI / 180);
+    const latRad = centroLat * (Math.PI / 180);
+    const dx = raioMetros * Math.cos(theta);
+    const dy = raioMetros * Math.sin(theta);
+    const lat = centroLat + (dy / raioTerra) * (180 / Math.PI);
+    const lon = centroLong + (dx / (raioTerra * Math.cos(latRad))) * (180 / Math.PI);
+    coords.push([lon, lat]);
+  }
+  return {
+    type: 'FeatureCollection',
+    features: [{
+      type: 'Feature',
+      id: id,
+      geometry: { type: 'Polygon', coordinates: [coords] },
+      properties: { cor: corHex }
+    }]
+  };
 }
 
 export default function OcorrenciaDetalhes() {
@@ -49,6 +74,14 @@ export default function OcorrenciaDetalhes() {
       setCarregando(false);
     });
   }, [id]);
+
+  // Memoriza a geração do círculo para não recalcular a cada renderização
+  const areaGeoJSON = useMemo(() => {
+    if (!ocorrencia) return null;
+    const { latitude, longitude, raioMetros, gravidade } = ocorrencia;
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+    return gerarCirculoGeoJSON(longitude, latitude, raioMetros || 1000, 'area-risco', dadosGravidade(gravidade).cor);
+  }, [ocorrencia]);
 
   if (carregando) return <View style={styles.center}><ActivityIndicator size="large" color="#1a73e8" /></View>;
 
@@ -128,13 +161,36 @@ export default function OcorrenciaDetalhes() {
         {ocorrencia.gravidade === 'Emergência' && <TouchableOpacity style={styles.shelterLink} onPress={() => router.push('/abrigos')}><Text style={styles.shelterLinkText}>🏠 Ver abrigos e pontos seguros</Text></TouchableOpacity>}
       </View>
 
-      {possuiCoordenadas && (
+      {possuiCoordenadas && areaGeoJSON && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Localização e área afetada</Text>
-          <MapView provider={PROVIDER_GOOGLE} style={styles.map} initialRegion={{ ...coordenada, latitudeDelta: 0.025, longitudeDelta: 0.025 }} scrollEnabled={false} zoomEnabled={false} rotateEnabled={false} pitchEnabled={false}>
-            <Circle center={coordenada} radius={ocorrencia.raioMetros || 1000} fillColor={`${gravidade.cor}30`} strokeColor={gravidade.cor} strokeWidth={2} />
-            <Marker coordinate={coordenada} pinColor={gravidade.cor} />
-          </MapView>
+          <Mapbox.MapView 
+            style={styles.map} 
+            scrollEnabled={false} 
+            zoomEnabled={false} 
+            rotateEnabled={false} 
+            pitchEnabled={false}
+            logoEnabled={false}
+            attributionEnabled={false}
+            styleURL="mapbox://styles/mapbox/streets-v12"
+          >
+            <Mapbox.Camera
+              defaultSettings={{
+                centerCoordinate: [coordenada.longitude, coordenada.latitude],
+                zoomLevel: 14,
+              }}
+            />
+
+            <Mapbox.ShapeSource id="areaUnicaSource" shape={areaGeoJSON}>
+              <Mapbox.FillLayer id="areaUnicaFill" style={{ fillColor: ['get', 'cor'], fillOpacity: 0.15 }} />
+              <Mapbox.LineLayer id="areaUnicaLine" style={{ lineColor: ['get', 'cor'], lineWidth: 2 }} />
+            </Mapbox.ShapeSource>
+
+            <Mapbox.PointAnnotation id="pinoCentro" coordinate={[coordenada.longitude, coordenada.latitude]}>
+              <View style={{ width: 22, height: 22, backgroundColor: gravidade.cor, borderRadius: 11, borderWidth: 2, borderColor: '#fff' }} />
+            </Mapbox.PointAnnotation>
+          </Mapbox.MapView>
+          
           <Text style={styles.coordinates}>Lat. {coordenada.latitude.toFixed(5)} · Long. {coordenada.longitude.toFixed(5)}</Text>
           <TouchableOpacity style={styles.routeButton} onPress={abrirRota}><Text style={styles.routeButtonText}>🧭 Abrir rota no Google Maps</Text></TouchableOpacity>
         </View>

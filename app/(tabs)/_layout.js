@@ -1,6 +1,8 @@
 import { Tabs } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Text } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Entypo, FontAwesome5, Octicons } from '@expo/vector-icons';
 
 import { Colors } from '../../constants/theme';
 import { useColorScheme } from '../../hooks/use-color-scheme';
@@ -11,6 +13,7 @@ import { observarStatusAdministrador } from '../../services/accessControl';
 export default function TabLayout() {
   const colorScheme = useColorScheme() ?? 'light';
   const [administrador, setAdministrador] = useState(false);
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     let pararAdmin = () => {};
@@ -27,9 +30,8 @@ export default function TabLayout() {
         tabBarActiveTintColor: Colors[colorScheme].tint,
         headerShown: false,
         tabBarStyle: {
-          height: 90,          
-          paddingBottom: 10,   
-          paddingTop: 6,       
+          height: 60 + insets.bottom,          
+          paddingBottom: insets.bottom,       
           backgroundColor: '#fff',
         },
         tabBarLabelStyle: {
@@ -44,7 +46,7 @@ export default function TabLayout() {
         options={{
           title: 'Mapa',
           tabBarIcon: ({ color }) => (
-            <Text style={{ fontSize: 22 }}>🗺️</Text>
+            <Entypo name="map" size={24} color={color} />
           ),
         }}
       />
@@ -54,7 +56,7 @@ export default function TabLayout() {
         options={{
           title: 'Abrigos',
           tabBarIcon: () => (
-            <Text style={{ fontSize: 22 }}>🏠</Text>
+            <FontAwesome5 name="house-user" size={24} color="black" />
           ),
         }}
       />
@@ -64,7 +66,7 @@ export default function TabLayout() {
         options={{
           title: 'Estatísticas',
           tabBarIcon: () => (
-            <Text style={{ fontSize: 22 }}>📈</Text>
+            <Octicons name="graph" size={24} color="black" />
           ),
         }}
       />
@@ -76,7 +78,7 @@ export default function TabLayout() {
           title: 'Alertas',
           href: administrador ? undefined : null,
           tabBarIcon: ({ color }) => (
-            <Text style={{ fontSize: 22 }}>⚠️</Text>
+            <Entypo name="warning" size={24} color="black" />
           ),
         }}
       />
@@ -87,7 +89,7 @@ export default function TabLayout() {
           title: 'Relatório',
           href: administrador ? undefined : null,
           tabBarIcon: () => (
-            <Text style={{ fontSize: 22 }}>📊</Text>
+            <Entypo name="bar-graph" size={24} color="black" />
           ),
         }}
       />
