@@ -18,7 +18,7 @@ const styles = StyleSheet.create({
   heatmapHeaderButton: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#f1f3f4', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#dadce0' },
   heatmapHeaderButtonActive: { backgroundColor: '#fce8e6', borderColor: '#d93025' },
   heatmapHeaderText: { fontSize: 18 },
-  filterBar: { position: 'absolute', top: 112, left: 14, right: 0 },
+  filterBar: { position: 'absolute', top: 121, left: 14, right: 0 },
   chip: { backgroundColor: '#fff', paddingHorizontal: 14, paddingVertical: 9, borderRadius: 22, marginRight: 8, elevation: 4 },
   chipText: { color: '#202124', fontWeight: '600' },
   heatmapChipActive: { backgroundColor: '#d93025' },
