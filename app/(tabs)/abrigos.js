@@ -1,14 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Alert, FlatList, Image, Linking, Modal, ScrollView, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import * as Location from 'expo-location';
-import * as ImagePicker from 'expo-image-picker';
 import { addDoc, collection, deleteDoc, doc, getFirestore, onSnapshot, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
-import app, { auth } from '../../services/firebaseConfig';
+import { Entypo, Ionicons, MaterialIcons, FontAwesome5, MaterialCommunityIcons, Feather, FontAwesome, FontAwesome6 } from '@expo/vector-icons';
+
+import * as Location from 'expo-location';
+import * as ImagePicker from 'expo-image-picker';
+
 import { observarStatusAdministrador } from '../../services/accessControl';
 import { distanciaKm } from '../../services/proximityNotifications';
 import { pesquisarEnderecos } from '../../services/addressSearch';
 import { uploadImage } from '../../services/imageUpload';
+import app, { auth } from '../../services/firebaseConfig';
 import styles from '../../styles/abrigos.styles';
 
 const db = getFirestore(app);
@@ -41,6 +45,7 @@ export default function AbrigosScreen() {
   const [resultadosEndereco, setResultadosEndereco] = useState([]);
   const [buscandoEndereco, setBuscandoEndereco] = useState(false);
   const [administrador, setAdministrador] = useState(false);
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     let pararAdmin = () => {};
@@ -229,7 +234,9 @@ export default function AbrigosScreen() {
                 {item.aceitaAnimais && <Text style={styles.tag}>🐾 Aceita animais</Text>}
                 {(item.recursos || []).map(recurso => <Text key={recurso} style={styles.tag}>{recurso}</Text>)}
               </View>
-              <TouchableOpacity style={styles.routeButton} onPress={() => abrirRota(item)}><Text style={styles.routeText}>🧭 Abrir rota</Text></TouchableOpacity>
+              <TouchableOpacity style={styles.routeButton} onPress={() => abrirRota(item)}>
+                <Text style={styles.routeText}>🧭 Abrir rota</Text>
+              </TouchableOpacity>
               {administrador && <View style={styles.adminActions}>
                 <TouchableOpacity style={styles.editButton} onPress={() => abrirEdicao(item)}><Text style={styles.editText}>Editar</Text></TouchableOpacity>
                 <TouchableOpacity style={styles.deleteButton} onPress={() => excluirAbrigo(item)}><Text style={styles.deleteText}>Excluir</Text></TouchableOpacity>
@@ -239,7 +246,11 @@ export default function AbrigosScreen() {
         )}
       />
 
-      {administrador && <TouchableOpacity style={styles.addButton} onPress={abrirNovo}><Text style={styles.addText}>＋</Text></TouchableOpacity>}
+      {administrador && (
+        <TouchableOpacity style={[styles.addButton, { marginBottom: insets.bottom - 130 }]} onPress={abrirNovo}>
+          <FontAwesome6 name="plus" size={24} color="black" />
+        </TouchableOpacity>
+      )}
 
       <Modal visible={modalVisivel} transparent animationType="slide" onRequestClose={() => setModalVisivel(false)}>
         <View style={styles.modalOverlay}>

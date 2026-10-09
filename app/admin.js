@@ -2,10 +2,12 @@ import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-nati
 import { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
-import app, { auth } from '../services/firebaseConfig';
-import { isMainAdmin, observarStatusAdministrador } from '../services/accessControl';
 import { collection, getFirestore, onSnapshot } from 'firebase/firestore';
+import { Entypo, Ionicons, MaterialIcons, FontAwesome5, MaterialCommunityIcons, Feather, FontAwesome, FontAwesome6 } from '@expo/vector-icons';
+
+import { isMainAdmin, observarStatusAdministrador } from '../services/accessControl';
 import { statusEfetivo } from '../services/alertLifecycle';
+import app, { auth } from '../services/firebaseConfig';
 
 const db = getFirestore(app);
 
@@ -62,29 +64,37 @@ export default function Admin() {
       </View>
       <View style={styles.mainRisk}><Text style={styles.mainRiskLabel}>Risco ativo mais frequente</Text><Text style={styles.mainRiskValue}>{estatisticas.principal}</Text></View>
 
-      <TouchableOpacity style={styles.primary} onPress={() => router.replace('/mapa')}>
-        <Text style={styles.primaryText}>🗺️ Abrir mapa e publicar alerta</Text>
+      <TouchableOpacity style={[styles.primary, { flexDirection: 'row', alignItems: 'center', justifyContent: 'left' }]} onPress={() => router.replace('/mapa')}>
+        <Entypo name="map" size={20} color="#ffffff" style={{ marginRight: 8 }} />
+        <Text style={styles.primaryText}> Abrir mapa</Text>
       </TouchableOpacity>
-      <TouchableOpacity style={styles.heatmapButton} onPress={() => router.replace('/mapa?calor=1')}>
-        <Text style={styles.heatmapButtonText}>🔥 Abrir mapa de calor histórico</Text>
+      <TouchableOpacity style={[styles.card, { flexDirection: 'row', alignItems: 'center', justifyContent: 'left' }]} onPress={() => router.replace('/mapa?calor=1')}>
+        <MaterialCommunityIcons name="fire" size={24} color="black" />
+        <Text style={styles.cardText}> Ver estatísticas</Text>
       </TouchableOpacity>
-      <TouchableOpacity style={styles.card} onPress={() => router.push('/lista')}>
-        <Text style={styles.cardText}>📋 Ver todas as ocorrências</Text>
+      <TouchableOpacity style={[styles.card, { flexDirection: 'row', alignItems: 'center', justifyContent: 'left' }]} onPress={() => router.push('/lista')}>
+        <Entypo name="text-document" size={24} color="black" />
+        <Text style={styles.cardText}> Ver todas as ocorrências</Text>
       </TouchableOpacity>
-      <TouchableOpacity style={styles.card} onPress={() => router.push('/relatorio')}>
-        <Text style={styles.cardText}>📊 Relatórios e exportação em PDF</Text>
+      <TouchableOpacity style={[styles.card, { flexDirection: 'row', alignItems: 'center', justifyContent: 'left' }]} onPress={() => router.push('/relatorio')}>
+        <Entypo name="bar-graph" size={24} color="black" />
+        <Text style={styles.cardText}> Relatórios</Text>
       </TouchableOpacity>
-      {principal && <TouchableOpacity style={styles.card} onPress={() => router.push('/administradores')}>
-        <Text style={styles.cardText}>👥 Cadastrar administradores</Text>
+      {principal && <TouchableOpacity style={[styles.card, { flexDirection: 'row', alignItems: 'center', justifyContent: 'left' }]} onPress={() => router.push('/administradores')}>
+        <Ionicons name="people" size={24} color="black" />
+        <Text style={styles.cardText}> Cadastrar administradores</Text>
       </TouchableOpacity>}
-      <TouchableOpacity style={styles.card} onPress={() => router.push('/abrigos')}>
-        <Text style={styles.cardText}>🏠 Gerenciar abrigos e pontos seguros</Text>
+      <TouchableOpacity style={[styles.card, { flexDirection: 'row', alignItems: 'center', justifyContent: 'left' }]} onPress={() => router.push('/abrigos')}>
+        <FontAwesome5 name="house-user" size={24} color="black" />
+        <Text style={styles.cardText}> Gerenciar abrigos</Text>
       </TouchableOpacity>
-      <TouchableOpacity style={styles.card} onPress={() => router.push('/perfil')}>
-        <Text style={styles.cardText}>👤 Meu perfil</Text>
+      <TouchableOpacity style={[styles.card, { flexDirection: 'row', alignItems: 'center', justifyContent: 'left' }]} onPress={() => router.push('/perfil')}>
+        <Ionicons name="person" size={24} color="black" />
+        <Text style={styles.cardText}> Meu perfil</Text>
       </TouchableOpacity>
-      <TouchableOpacity style={styles.logout} onPress={sair}>
-        <Text style={styles.logoutText}>Sair da conta</Text>
+      <TouchableOpacity style={[styles.logout, { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }]} onPress={sair}>
+        <MaterialCommunityIcons name="exit-to-app" size={24} color="red" />
+        <Text style={styles.logoutText}> Sair da conta</Text>
       </TouchableOpacity>
     </ScrollView>
   );
