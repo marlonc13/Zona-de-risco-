@@ -19,7 +19,7 @@ const PERIODOS = [
   { label: '90 dias', dias: 90 },
 ];
 
-const TIPOS = ['Todos', 'Alagamento', 'Enchente', 'Deslizamento', 'Vendaval', 'Seca', 'Incêndio florestal'];
+const TIPOS = ['Todos', 'Alagamento', 'Enchente', 'Deslizamento', 'Vendaval',  'Incêndio florestal'];
 
 function emojiDoTipo(tipo) {
   const tipos = [
@@ -27,7 +27,6 @@ function emojiDoTipo(tipo) {
     { label: 'Enchente', emoji: '🌧️' },
     { label: 'Deslizamento', emoji: '⛰️' },
     { label: 'Vendaval', emoji: '🌪️' },
-    { label: 'Seca', emoji: '☀️' },
     { label: 'Incêndio florestal', emoji: '🔥' },
   ];
   return tipos.find(item => item.label === tipo)?.emoji || '📍';
@@ -51,14 +50,13 @@ export default function ListaAlertasScreen() {
   const [gravidadeFiltro, setGravidadeFiltro] = useState('Todas');
   const [statusFiltro, setStatusFiltro] = useState('Todos');
   const [filtrosVisiveis, setFiltrosVisiveis] = useState(true);
+  const [administrador, setAdministrador] = useState(false);
 
   useEffect(() => {
     let pararAdmin = () => {};
     const pararAuth = onAuthStateChanged(auth, user => {
       pararAdmin();
-      pararAdmin = observarStatusAdministrador(user, autorizado => {
-        if (!autorizado) router.replace('/mapa');
-      });
+      pararAdmin = observarStatusAdministrador(user, setAdministrador);
     });
     return () => { pararAuth(); pararAdmin(); };
   }, [router]);
@@ -80,6 +78,10 @@ export default function ListaAlertasScreen() {
   }, []);
 
   const atualizarStatus = async (item, novoStatus) => {
+    if (!administrador) {
+      Alert.alert('Acesso restrito', 'Somente administradores podem alterar alertas.');
+      return;
+    }
     const agora = Date.now();
     const anterior = statusEfetivo(item);
     if (anterior === novoStatus) return;
@@ -137,7 +139,12 @@ export default function ListaAlertasScreen() {
     );
   };
 
-  const excluirAlerta = item => Alert.alert(
+  const excluirAlerta = item => {
+    if (!administrador) {
+      Alert.alert('Acesso restrito', 'Somente administradores podem excluir alertas.');
+      return;
+    }
+    return Alert.alert(
     'Excluir definitivamente',
     'Essa ação remove a ocorrência do histórico. Deseja continuar?',
     [
@@ -145,8 +152,13 @@ export default function ListaAlertasScreen() {
       { text: 'Excluir', style: 'destructive', onPress: () => deleteDoc(doc(db, 'marcacoes', item.id)) },
     ],
   );
+  };
 
   const abrirEdicao = item => {
+    if (!administrador) {
+      Alert.alert('Acesso restrito', 'Somente administradores podem editar alertas.');
+      return;
+    }
     setEditando(item);
     setDescricaoEdicao(item.comentario || '');
     setGravidadeEdicao(item.gravidade || 'Atenção');
@@ -156,6 +168,10 @@ export default function ListaAlertasScreen() {
   };
 
   const salvarEdicao = async () => {
+    if (!administrador) {
+      Alert.alert('Acesso restrito', 'Somente administradores podem editar alertas.');
+      return;
+    }
     if (!editando || !descricaoEdicao.trim()) return Alert.alert('Descrição obrigatória', 'Informe a situação atual do local.');
     if (!bairroEdicao.trim()) return Alert.alert('Bairro obrigatório', 'Informe o bairro da ocorrência.');
     try {
@@ -203,6 +219,8 @@ export default function ListaAlertasScreen() {
     const inicioPeriodo = periodoDias === null ? null : agora - periodoDias * 24 * 60 * 60 * 1000;
 
     return alertas.filter(item => {
+      // Rascunhos são privados; visitantes e usuários veem alertas publicados e históricos.
+      if (!administrador && statusEfetivo(item) === 'rascunho') return false;
       const data = item.createdAtMillis || 0;
       const correspondePeriodo = inicioPeriodo === null || data >= inicioPeriodo;
       const correspondeBairro = !bairroBuscado || (item.bairro || '').toLocaleLowerCase('pt-BR').includes(bairroBuscado);
@@ -211,7 +229,7 @@ export default function ListaAlertasScreen() {
       const correspondeStatus = statusFiltro === 'Todos' || statusEfetivo(item) === statusFiltro;
       return correspondePeriodo && correspondeBairro && correspondeTipo && correspondeGravidade && correspondeStatus;
     });
-  }, [alertas, periodoDias, bairroFiltro, tipoFiltro, gravidadeFiltro, statusFiltro]);
+  }, [alertas, periodoDias, bairroFiltro, tipoFiltro, gravidadeFiltro, statusFiltro, administrador]);
 
   const limparFiltros = () => {
     setPeriodoDias(null);
@@ -234,8 +252,8 @@ export default function ListaAlertasScreen() {
       <View style={styles.header}>
         <View style={styles.headerTitleRow}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.title}>Histórico de alertas</Text>
-            <Text style={styles.subtitle}>Ocorrências ativas, expiradas e encerradas</Text>
+            <Text style={styles.title}>Todos os alertas</Text>
+            <Text style={styles.subtitle}>Todos podem consultar; somente administradores podem editar ou excluir.</Text>
           </View>
           <TouchableOpacity style={styles.filterToggle} onPress={() => setFiltrosVisiveis(atual => !atual)}>
             <Text style={styles.filterToggleText}>⚙ Filtros</Text>
@@ -277,9 +295,9 @@ export default function ListaAlertasScreen() {
         </View>
       )}
 
-      {alertas.length === 0 ? (
+      {alertasFiltrados.length === 0 ? (
         <View style={styles.center}>
-          <Text style={styles.emptyText}>Nenhum risco detectado no momento!</Text>
+          <Text style={styles.emptyText}>Nenhum alerta corresponde aos filtros selecionados.</Text>
         </View>
       ) : (
         <FlatList
@@ -336,9 +354,11 @@ export default function ListaAlertasScreen() {
                 </View>
                 <View style={styles.actions}>
                   <TouchableOpacity style={styles.detailsAction} onPress={() => router.push(`/ocorrencia/${item.id}`)}><Text style={styles.detailsActionText}>🔎 Detalhes</Text></TouchableOpacity>
-                  <TouchableOpacity style={styles.editAction} onPress={() => abrirEdicao(item)}><Text style={styles.editActionText}>✏️ Editar</Text></TouchableOpacity>
-                  <TouchableOpacity style={styles.closeAction} onPress={() => setAlterandoStatus(item)}><Text style={styles.closeActionText}>🔄 Alterar situação</Text></TouchableOpacity>
-                  <TouchableOpacity style={styles.deleteAction} onPress={() => excluirAlerta(item)}><Text style={styles.deleteActionText}>Excluir</Text></TouchableOpacity>
+                  {administrador && <>
+                    <TouchableOpacity style={styles.editAction} onPress={() => abrirEdicao(item)}><Text style={styles.editActionText}>✏️ Editar</Text></TouchableOpacity>
+                    <TouchableOpacity style={styles.closeAction} onPress={() => setAlterandoStatus(item)}><Text style={styles.closeActionText}>🔄 Alterar situação</Text></TouchableOpacity>
+                    <TouchableOpacity style={styles.deleteAction} onPress={() => excluirAlerta(item)}><Text style={styles.deleteActionText}>Excluir</Text></TouchableOpacity>
+                  </>}
                 </View>
               </View>
             </View>
@@ -346,7 +366,7 @@ export default function ListaAlertasScreen() {
         />
       )}
 
-      <Modal visible={!!alterandoStatus} transparent animationType="fade" onRequestClose={() => setAlterandoStatus(null)}>
+      <Modal visible={administrador && !!alterandoStatus} transparent animationType="fade" onRequestClose={() => setAlterandoStatus(null)}>
         <View style={styles.statusModalOverlay}>
           <View style={styles.statusModalBox}>
             <Text style={styles.modalTitle}>Alterar situação</Text>
@@ -364,7 +384,7 @@ export default function ListaAlertasScreen() {
         </View>
       </Modal>
 
-      <Modal visible={!!editando} transparent animationType="slide" onRequestClose={() => setEditando(null)}>
+      <Modal visible={administrador && !!editando} transparent animationType="slide" onRequestClose={() => setEditando(null)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
             <ScrollView showsVerticalScrollIndicator={false}>

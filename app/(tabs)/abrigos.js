@@ -1,14 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Alert, FlatList, Image, Linking, Modal, ScrollView, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import * as Location from 'expo-location';
-import * as ImagePicker from 'expo-image-picker';
 import { addDoc, collection, deleteDoc, doc, getFirestore, onSnapshot, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
-import app, { auth } from '../../services/firebaseConfig';
+import { Entypo, Ionicons, MaterialIcons, FontAwesome5, MaterialCommunityIcons, Feather, FontAwesome, FontAwesome6 } from '@expo/vector-icons';
+
+import * as Location from 'expo-location';
+import * as ImagePicker from 'expo-image-picker';
+
 import { observarStatusAdministrador } from '../../services/accessControl';
 import { distanciaKm } from '../../services/proximityNotifications';
 import { pesquisarEnderecos } from '../../services/addressSearch';
 import { uploadImage } from '../../services/imageUpload';
+import app, { auth } from '../../services/firebaseConfig';
 import styles from '../../styles/abrigos.styles';
 
 const db = getFirestore(app);
@@ -41,6 +45,7 @@ export default function AbrigosScreen() {
   const [resultadosEndereco, setResultadosEndereco] = useState([]);
   const [buscandoEndereco, setBuscandoEndereco] = useState(false);
   const [administrador, setAdministrador] = useState(false);
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     let pararAdmin = () => {};
@@ -184,10 +189,35 @@ export default function AbrigosScreen() {
   ]);
 
   const abrirRota = async abrigo => {
-    const destino = abrigo.latitude && abrigo.longitude
+    if (abrigo.situacao !== 'Aberto') {
+      Alert.alert(
+        'Confirme a situação do local',
+        `Este local está marcado como "${abrigo.situacao || 'situação não informada'}". Confira as orientações das autoridades antes de se deslocar.`,
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          { text: 'Abrir mesmo assim', onPress: () => abrirRotaConfirmada(abrigo) },
+        ],
+      );
+      return;
+    }
+    await abrirRotaConfirmada(abrigo);
+  };
+
+  const abrirRotaConfirmada = async abrigo => {
+    const temCoordenadas = Number.isFinite(abrigo.latitude) && Number.isFinite(abrigo.longitude);
+    const destino = temCoordenadas
       ? `${abrigo.latitude},${abrigo.longitude}`
-      : encodeURIComponent(abrigo.endereco);
-    await Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${destino}`);
+      : encodeURIComponent(abrigo.endereco || '');
+    const origem = localizacao
+      ? `&origin=${localizacao.latitude},${localizacao.longitude}`
+      : '';
+    const url = `https://www.google.com/maps/dir/?api=1${origem}&destination=${destino}&travelmode=walking`;
+    try {
+      await Linking.openURL(url);
+    } catch (erro) {
+      console.error('Não foi possível abrir a rota:', erro);
+      Alert.alert('Rota indisponível', 'Não foi possível abrir o Google Maps neste momento.');
+    }
   };
 
   return (
@@ -229,7 +259,9 @@ export default function AbrigosScreen() {
                 {item.aceitaAnimais && <Text style={styles.tag}>🐾 Aceita animais</Text>}
                 {(item.recursos || []).map(recurso => <Text key={recurso} style={styles.tag}>{recurso}</Text>)}
               </View>
-              <TouchableOpacity style={styles.routeButton} onPress={() => abrirRota(item)}><Text style={styles.routeText}>🧭 Abrir rota</Text></TouchableOpacity>
+              <TouchableOpacity style={styles.routeButton} onPress={() => abrirRota(item)}>
+                <Text style={styles.routeText}>🧭 Abrir rota</Text>
+              </TouchableOpacity>
               {administrador && <View style={styles.adminActions}>
                 <TouchableOpacity style={styles.editButton} onPress={() => abrirEdicao(item)}><Text style={styles.editText}>Editar</Text></TouchableOpacity>
                 <TouchableOpacity style={styles.deleteButton} onPress={() => excluirAbrigo(item)}><Text style={styles.deleteText}>Excluir</Text></TouchableOpacity>
@@ -239,7 +271,11 @@ export default function AbrigosScreen() {
         )}
       />
 
-      {administrador && <TouchableOpacity style={styles.addButton} onPress={abrirNovo}><Text style={styles.addText}>＋</Text></TouchableOpacity>}
+      {administrador && (
+        <TouchableOpacity style={[styles.addButton, { marginBottom: insets.bottom - 130 }]} onPress={abrirNovo}>
+          <FontAwesome6 name="plus" size={24} color="black" />
+        </TouchableOpacity>
+      )}
 
       <Modal visible={modalVisivel} transparent animationType="slide" onRequestClose={() => setModalVisivel(false)}>
         <View style={styles.modalOverlay}>

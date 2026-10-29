@@ -145,7 +145,15 @@ export default function Perfil() {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Perfil</Text>
+      <TouchableOpacity
+        style={[styles.secondaryButton, { alignSelf: 'stretch', alignItems: 'center', marginBottom: 16 }]}
+        onPress={() => router.replace('/mapa')}
+        accessibilityRole="button"
+        accessibilityLabel="Voltar à tela inicial"
+      >
+        <Text style={styles.secondaryText}>← Voltar para o início</Text>
+      </TouchableOpacity>
+      <Text style={styles.title}>Perfil do usuário</Text>
       <TouchableOpacity onPress={escolherFoto} style={styles.avatar}>
         {foto ? <Image source={{ uri: foto }} style={styles.avatarImage} /> : <Text style={styles.plus}>+</Text>}
       </TouchableOpacity>

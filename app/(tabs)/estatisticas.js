@@ -1,13 +1,13 @@
 import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
 import { useEffect, useMemo, useState } from 'react';
 import { collection, getFirestore, onSnapshot } from 'firebase/firestore';
-import MapView, { Heatmap, PROVIDER_GOOGLE } from 'react-native-maps';
+import Mapbox from '@rnmapbox/maps';
 import app from '../../services/firebaseConfig';
-import { statusEfetivo } from '../../services/alertLifecycle';
+import { STATUS_ALERTA, statusEfetivo } from '../../services/alertLifecycle';
 import styles from '../../styles/estatisticas.styles';
 
 const db = getFirestore(app);
-const TIPOS = ['Alagamento', 'Enchente', 'Deslizamento', 'Vendaval', 'Seca', 'Incêndio florestal'];
+const TIPOS = ['Alagamento', 'Enchente', 'Deslizamento', 'Vendaval','Incêndio florestal'];
 const GRAVIDADES = ['Atenção', 'Alerta', 'Emergência'];
 
 function contarPor(lista, campo, opcoes = null) {
@@ -52,26 +52,46 @@ export default function EstatisticasPublicas() {
     const recentes = ocorrencias.filter(item => agora - (item.createdAtMillis || 0) <= trintaDias).length;
     const tipos = contarPor(ocorrencias, 'tipo', TIPOS);
     const gravidades = contarPor(ocorrencias, 'gravidade', GRAVIDADES);
-    const bairros = contarPor(ocorrencias.filter(item => item.bairro), 'bairro').slice(0, 5);
-    return { ativas, encerradas, emergencias, recentes, tipos, gravidades, bairros };
+    const bairros = contarPor(ocorrencias.filter(item => item.bairro), 'bairro').slice(0, 8);
+    const status = STATUS_ALERTA.map(item => ({
+      nome: item.label,
+      total: ocorrencias.filter(alerta => statusEfetivo(alerta) === item.id).length,
+      cor: item.cor,
+    }));
+    const periodos = [
+      { nome: 'Hoje', total: ocorrencias.filter(item => agora - (item.createdAtMillis || 0) <= 24 * 60 * 60 * 1000).length },
+      { nome: 'Últimos 7 dias', total: ocorrencias.filter(item => agora - (item.createdAtMillis || 0) <= 7 * 24 * 60 * 60 * 1000).length },
+      { nome: 'Últimos 30 dias', total: recentes },
+    ];
+    return { ativas, encerradas, emergencias, recentes, tipos, gravidades, bairros, status, periodos };
   }, [ocorrencias]);
 
-  const pontosCalor = useMemo(() => ocorrencias
-    .filter(item => Number.isFinite(item.latitude) && Number.isFinite(item.longitude))
-    .map(item => ({ latitude: item.latitude, longitude: item.longitude, weight: 1 })), [ocorrencias]);
+const heatmapGeoJSON = useMemo(() => {
+    const features = ocorrencias
+      .filter(item => Number.isFinite(item.latitude) && Number.isFinite(item.longitude))
+      .map(item => ({
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [item.longitude, item.latitude] },
+        properties: { weight: 1 }
+      }));
+    return { type: 'FeatureCollection', features };
+  }, [ocorrencias]);
 
-  const regiaoCalor = useMemo(() => {
-    if (!pontosCalor.length) return { latitude: -22.47, longitude: -43.82, latitudeDelta: 0.8, longitudeDelta: 0.8 };
-    const latitude = pontosCalor.reduce((total, ponto) => total + ponto.latitude, 0) / pontosCalor.length;
-    const longitude = pontosCalor.reduce((total, ponto) => total + ponto.longitude, 0) / pontosCalor.length;
-    return { latitude, longitude, latitudeDelta: 0.8, longitudeDelta: 0.8 };
-  }, [pontosCalor]);
+  // Cálculo do centro da câmera do mapa baseado na média das coordenadas
+  const centroMapa = useMemo(() => {
+    if (!heatmapGeoJSON.features.length) return [-43.82, -22.47]; // Padrão: Vassouras
+    const longitude = heatmapGeoJSON.features.reduce((total, p) => total + p.geometry.coordinates[0], 0) / heatmapGeoJSON.features.length;
+    const latitude = heatmapGeoJSON.features.reduce((total, p) => total + p.geometry.coordinates[1], 0) / heatmapGeoJSON.features.length;
+    return [longitude, latitude];
+  }, [heatmapGeoJSON]);
 
   if (carregando) return <View style={styles.center}><ActivityIndicator size="large" color="#1a73e8" /><Text style={styles.loading}>Carregando estatísticas...</Text></View>;
 
   const maiorTipo = Math.max(1, ...dados.tipos.map(item => item.total));
   const maiorGravidade = Math.max(1, ...dados.gravidades.map(item => item.total));
   const maiorBairro = Math.max(1, ...dados.bairros.map(item => item.total));
+  const maiorStatus = Math.max(1, ...dados.status.map(item => item.total));
+  const maiorPeriodo = Math.max(1, ...dados.periodos.map(item => item.total));
 
   return <ScrollView style={styles.container} contentContainerStyle={styles.content}>
     <Text style={styles.title}>Estatísticas públicas</Text>
@@ -89,19 +109,63 @@ export default function EstatisticasPublicas() {
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>Mapa de calor histórico</Text>
       <Text style={styles.mapHelp}>As cores mostram onde existe maior concentração de ocorrências publicadas.</Text>
-      {pontosCalor.length ? <>
-        <MapView provider={PROVIDER_GOOGLE} style={styles.heatmap} initialRegion={regiaoCalor} scrollEnabled={false} zoomEnabled={false} rotateEnabled={false} pitchEnabled={false}>
-          <Heatmap points={pontosCalor} radius={42} opacity={0.8} gradient={{ colors: ['#2b83ba', '#abdda4', '#ffffbf', '#fdae61', '#d7191c'], startPoints: [0, 0.25, 0.5, 0.75, 1], colorMapSize: 256 }} />
-        </MapView>
+      
+      {heatmapGeoJSON.features.length ? <>
+        <Mapbox.MapView 
+          style={styles.heatmap} 
+          scrollEnabled={false} 
+          zoomEnabled={false} 
+          rotateEnabled={false} 
+          pitchEnabled={false}
+          logoEnabled={false}
+          attributionEnabled={false}
+          styleURL="mapbox://styles/mapbox/streets-v12"
+        >
+          <Mapbox.Camera
+            defaultSettings={{
+              centerCoordinate: centroMapa,
+              zoomLevel: 8.5,
+            }}
+          />
+          <Mapbox.ShapeSource id="statsHeatmapSource" shape={heatmapGeoJSON}>
+            <Mapbox.HeatmapLayer
+              id="statsHeatmapLayer"
+              style={{
+                heatmapWeight: 1,
+                heatmapIntensity: 1,
+                heatmapRadius: 40,
+                heatmapOpacity: 0.8,
+                heatmapColor: [
+                  'interpolate', ['linear'], ['heatmap-density'],
+                  0, 'rgba(33,102,172,0)',
+                  0.25, '#abdda4',
+                  0.5, '#ffffbf',
+                  0.75, '#fdae61',
+                  1, '#d7191c'
+                ]
+              }}
+            />
+          </Mapbox.ShapeSource>
+        </Mapbox.MapView>
         <View style={styles.mapGradient}><View style={[styles.mapColor, { backgroundColor: '#2b83ba' }]} /><View style={[styles.mapColor, { backgroundColor: '#abdda4' }]} /><View style={[styles.mapColor, { backgroundColor: '#ffffbf' }]} /><View style={[styles.mapColor, { backgroundColor: '#fdae61' }]} /><View style={[styles.mapColor, { backgroundColor: '#d7191c' }]} /></View>
         <View style={styles.mapLegendLabels}><Text style={styles.mapLegendText}>Menor concentração</Text><Text style={styles.mapLegendText}>Maior concentração</Text></View>
-        <Text style={styles.mapCount}>{pontosCalor.length} ocorrência(s) analisada(s)</Text>
+        <Text style={styles.mapCount}>{heatmapGeoJSON.features.length} ocorrência(s) analisada(s)</Text>
       </> : <Text style={styles.empty}>Ainda não existem ocorrências com localização para montar o mapa.</Text>}
+    </View>
+
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>Ocorrências por período</Text>
+      {dados.periodos.map(item => <Barra key={item.nome} {...item} maximo={maiorPeriodo} cor="#00897b" />)}
+    </View>
+
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>Ocorrências por situação</Text>
+      {dados.status.map(item => <Barra key={item.nome} {...item} maximo={maiorStatus} cor={item.cor || '#1a73e8'} />)}
     </View>
 
     <View style={styles.section}><Text style={styles.sectionTitle}>Ocorrências por tipo</Text>{dados.tipos.map(item => <Barra key={item.nome} {...item} maximo={maiorTipo} />)}</View>
     <View style={styles.section}><Text style={styles.sectionTitle}>Ocorrências por gravidade</Text>{dados.gravidades.map(item => <Barra key={item.nome} {...item} maximo={maiorGravidade} cor={{ Atenção: '#f9ab00', Alerta: '#e8710a', Emergência: '#d93025' }[item.nome]} />)}</View>
-    <View style={styles.section}><Text style={styles.sectionTitle}>Bairros com mais registros</Text>{dados.bairros.length ? dados.bairros.map(item => <Barra key={item.nome} {...item} maximo={maiorBairro} cor="#7b1fa2" />) : <Text style={styles.empty}>Ainda não há bairros informados.</Text>}</View>
+    <View style={styles.section}><Text style={styles.sectionTitle}>Bairros com mais registros (até 8)</Text>{dados.bairros.length ? dados.bairros.map(item => <Barra key={item.nome} {...item} maximo={maiorBairro} cor="#7b1fa2" />) : <Text style={styles.empty}>Ainda não há bairros informados.</Text>}</View>
 
     <View style={styles.privacyBox}><Text style={styles.privacyTitle}>🔒 Painel somente para consulta</Text><Text style={styles.privacyText}>Usuários e visitantes não podem editar estes dados. Informações de administradores e moradores não aparecem nesta tela.</Text></View>
   </ScrollView>;

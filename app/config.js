@@ -1,11 +1,14 @@
 import { View, Text, TouchableOpacity, Switch, Alert } from 'react-native';
 import { useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { deleteUser } from 'firebase/auth';
 import { router } from 'expo-router';
+import { deleteUser } from 'firebase/auth';
+import { Entypo, Ionicons, MaterialIcons, FontAwesome5, MaterialCommunityIcons, Feather, FontAwesome, FontAwesome6 } from '@expo/vector-icons';
+
 import { auth } from '../services/firebaseConfig';
 import { Colors } from '../constants/theme';
 import { useTheme } from '../contexts/ThemeContext';
+
 import styles from '../styles/config.styles';
 
 export default function Config() {
@@ -96,7 +99,7 @@ export default function Config() {
 
   return (
     <View style={[styles.container, { backgroundColor: cores.background }]}> 
-      <Text style={styles.icon}>⚙️</Text>
+      <Entypo name="tools" size={54} color="grey" />
       <Text style={[styles.title, { color: cores.text }]}>Configurações</Text>
 
       <View style={styles.optionsContainer}>
@@ -106,16 +109,17 @@ export default function Config() {
               <Text style={[styles.label, { color: cores.text, fontSize: tamanhoFonte }]}>Minha residência</Text>
               <Text style={[styles.description, { color: cores.text }]}>Adicionar ou alterar o endereço cadastrado.</Text>
             </View>
-            <Text style={{ fontSize: 24 }}>🏠</Text>
+            <FontAwesome5 name="house-user" size={24} color="white" />
           </TouchableOpacity>
         )}
-        <View style={[styles.optionCard, { backgroundColor: cores.card }]}> 
+        {/* <View style={[styles.optionCard, { backgroundColor: cores.card }]}> 
           <View style={styles.optionTextArea}>
             <Text style={[styles.label, { color: cores.text, fontSize: tamanhoFonte }]}>Modo escuro</Text>
             <Text style={[styles.description, { color: cores.text }]}>Altera a aparência do aplicativo.</Text>
           </View>
           <Switch value={isDark} onValueChange={mudarTema} />
         </View>
+        */}
 
         <TouchableOpacity
           style={[styles.optionCard, { backgroundColor: cores.card }]}
@@ -125,7 +129,7 @@ export default function Config() {
             <Text style={[styles.label, { color: cores.text, fontSize: tamanhoFonte }]}>Letras grandes</Text>
             <Text style={[styles.description, { color: cores.text }]}>Aumenta o tamanho do texto desta tela.</Text>
           </View>
-          <Text style={[styles.bigText, { color: letraGrande ? '#1a73e8' : cores.text }]}>Aa</Text>
+          <MaterialCommunityIcons name="format-letter-case" size={34} color="white" />
         </TouchableOpacity>
 
         <TouchableOpacity
