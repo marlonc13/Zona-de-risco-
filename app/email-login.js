@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ImageBackground, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, Image } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ImageBackground, Alert, ActivityIndicator, KeyboardAvoidingView, ScrollView, Platform, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, signOut } from 'firebase/auth';
@@ -97,66 +97,74 @@ export default function EmailLogin() {
 
   return (
     <ImageBackground source={require('../assets/images/fundoentrada.png')} style={styles.container} resizeMode="cover" blurRadius={1}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.overlay}>
-        
-       
-        <View style={styles.logo}>
-          <Image 
-            source={require('../assets/images/icon.png')} 
-            style={styles.logoImagem} 
-            resizeMode="contain"
-          />
-        </View>
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
+        style={{ flex: 1 }}
+      >
+        <ScrollView 
+          contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: 20 }}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.overlay}>
+            <View style={styles.logo}>
+              <Image 
+                source={require('../assets/images/icon.png')} 
+                style={styles.logoImagem} 
+                resizeMode="contain"
+              />
+            </View>
 
-        <Text style={styles.title}>{modoCadastro ? 'Criar conta' : 'Entrar'}</Text>
-        <Text style={styles.subtitle}>Use e-mail e senha. Depois confirme a biometria para acessar.</Text>
+            <Text style={styles.title}>{modoCadastro ? 'Criar conta' : 'Entrar'}</Text>
+            <Text style={styles.subtitle}>Use e-mail e senha. Depois confirme a biometria para acessar.</Text>
 
-        {modoCadastro && (
-          <TextInput
-            style={styles.input}
-            placeholder="Nome"
-            placeholderTextColor="#777"
-            value={nome}
-            onChangeText={setNome}
-            autoCapitalize="words"
-          />
-        )}
+            {modoCadastro && (
+              <TextInput
+                style={styles.input}
+                placeholder="Nome"
+                placeholderTextColor="#777"
+                value={nome}
+                onChangeText={setNome}
+                autoCapitalize="words"
+              />
+            )}
 
-        <TextInput
-          style={styles.input}
-          placeholder="E-mail"
-          placeholderTextColor="#777"
-          value={email}
-          onChangeText={setEmail}
-          autoCapitalize="none"
-          keyboardType="email-address"
-        />
+            <TextInput
+              style={styles.input}
+              placeholder="E-mail"
+              placeholderTextColor="#777"
+              value={email}
+              onChangeText={setEmail}
+              autoCapitalize="none"
+              keyboardType="email-address"
+            />
 
-        <View style={styles.passwordBox}>
-          <TextInput
-            style={styles.passwordInput}
-            placeholder="Senha"
-            placeholderTextColor="#777"
-            value={senha}
-            onChangeText={setSenha}
-            secureTextEntry={!mostrarSenha}
-          />
-          <TouchableOpacity style={styles.eyeButton} onPress={() => setMostrarSenha(atual => !atual)}>
-            <Text style={styles.eyeText}>{mostrarSenha ? '🙈' : '👁️'}</Text>
-          </TouchableOpacity>
-        </View>
+            <View style={styles.passwordBox}>
+              <TextInput
+                style={styles.passwordInput}
+                placeholder="Senha"
+                placeholderTextColor="#777"
+                value={senha}
+                onChangeText={setSenha}
+                secureTextEntry={!mostrarSenha}
+              />
+              <TouchableOpacity style={styles.eyeButton} onPress={() => setMostrarSenha(atual => !atual)}>
+                <Text style={styles.eyeText}>{mostrarSenha ? '🙈' : '👁️'}</Text>
+              </TouchableOpacity>
+            </View>
 
-        <TouchableOpacity style={styles.button} onPress={enviar} disabled={carregando}>
-          {carregando ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>{modoCadastro ? 'Criar e entrar' : 'Entrar com senha'}</Text>}
-        </TouchableOpacity>
+            <TouchableOpacity style={styles.button} onPress={enviar} disabled={carregando}>
+              {carregando ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>{modoCadastro ? 'Criar e entrar' : 'Entrar com senha'}</Text>}
+            </TouchableOpacity>
 
-        <TouchableOpacity style={styles.linkButton} onPress={() => setModoCadastro(!modoCadastro)} disabled={carregando}>
-          <Text style={styles.linkText}>{modoCadastro ? 'Já tenho conta' : 'Não tenho conta, criar agora'}</Text>
-        </TouchableOpacity>
+            <TouchableOpacity style={styles.linkButton} onPress={() => setModoCadastro(!modoCadastro)} disabled={carregando}>
+              <Text style={styles.linkText}>{modoCadastro ? 'Já tenho conta' : 'Não tenho conta, criar agora'}</Text>
+            </TouchableOpacity>
 
-        <TouchableOpacity style={styles.voltarButton} onPress={() => router.replace('/inicio')} disabled={carregando}>
-          <Text style={styles.voltarText}>Voltar</Text>
-        </TouchableOpacity>
+            <TouchableOpacity style={styles.voltarButton} onPress={() => router.replace('/inicio')} disabled={carregando}>
+              <Text style={styles.voltarText}>Voltar</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </ImageBackground>
   );

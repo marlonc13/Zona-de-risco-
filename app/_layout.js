@@ -1,5 +1,6 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import 'react-native-reanimated';
 
 import { ThemeProvider as CustomThemeProvider } from '../contexts/ThemeContext';
@@ -9,7 +10,7 @@ function RootLayoutContent() {
     <>
       <Stack initialRouteName="index">
         <Stack.Screen name="index" options={{ headerShown: false }} />
-        <Stack.Screen name="inicio" options={{ title: 'Inicio' }} />
+        <Stack.Screen name="inicio" options={{ title: 'Inicio' , headerShown: false}} />
         <Stack.Screen name="login" options={{ headerShown: false }} />
         <Stack.Screen name="email-login" options={{ headerShown: false }} />
         <Stack.Screen name="admin" options={{ headerShown: false }} />
@@ -31,8 +32,10 @@ function RootLayoutContent() {
 
 export default function RootLayout() {
   return (
-    <CustomThemeProvider>
-      <RootLayoutContent />
-    </CustomThemeProvider>
+    <SafeAreaProvider>
+      <CustomThemeProvider>
+        <RootLayoutContent />
+      </CustomThemeProvider>
+    </SafeAreaProvider>
   );
 }

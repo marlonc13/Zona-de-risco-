@@ -5,7 +5,7 @@ export default StyleSheet.create({
   header: { paddingTop: 52, paddingHorizontal: 18, paddingBottom: 12, backgroundColor: '#fff' },
   title: { fontSize: 24, color: '#202124', fontWeight: '900' },
   subtitle: { color: '#5f6368', marginTop: 3 },
-  filters: { flexGrow: 0, paddingVertical: 10, paddingLeft: 14 },
+  filters: { flexGrow: 0, flexShrink:0, paddingVertical: 10, paddingLeft: 14 },
   filterChip: { backgroundColor: '#fff', paddingHorizontal: 13, paddingVertical: 9, borderRadius: 18, marginRight: 7, borderWidth: 1, borderColor: '#dadce0' },
   filterChipActive: { backgroundColor: '#1a73e8', borderColor: '#1a73e8' },
   filterText: { color: '#3c4043', fontWeight: '700', fontSize: 12 },

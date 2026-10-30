@@ -1,0 +1,76 @@
+module.exports = {
+  expo: {
+    name: "Zona de Risco",
+    slug: "area-de-risco",
+    version: "1.0.0",
+    orientation: "portrait",
+    icon: "./assets/images/splash-icon.png",
+    scheme: "areaderisco",
+    userInterfaceStyle: "automatic",
+    ios: {
+      supportsTablet: true,
+      infoPlist: {
+        NSLocationWhenInUseUsageDescription: "Este aplicativo precisa da sua localização para mostrar áreas de risco próximas.",
+        NSCameraUsageDescription: "Usamos a câmera para tirar fotos dos alertas e ler QR Code.",
+        NSPhotoLibraryUsageDescription: "Usamos a galeria para anexar fotos aos alertas e ao perfil."
+      }
+    },
+    android: {
+      package: "com.alinelasneau.areaderisco",
+      permissions: [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ],
+      adaptiveIcon: {
+        foregroundImage: "./assets/images/splash-icon.png",
+        backgroundColor: "#E6F4FE"
+      },
+      predictiveBackGestureEnabled: false
+    },
+    web: {
+      output: "static",
+      favicon: "./assets/images/splash-icon.png"
+    },
+    plugins: [
+      "expo-router",
+      "expo-location",
+      [
+        "expo-splash-screen",
+        {
+          image: "./assets/images/splash-icon.png",
+          imageWidth: 200,
+          resizeMode: "contain",
+          backgroundColor: "#ffffff",
+          dark: {
+            backgroundColor: "#000000"
+          }
+        }
+      ],
+      "expo-web-browser",
+      "expo-image-picker",
+      "expo-camera",
+      "expo-font",
+      "expo-notifications",
+      [
+        "@rnmapbox/maps",
+        {
+          RNMapboxMapsDownloadToken: process.env.MAPBOX_SECRET_TOKEN
+        }
+      ]
+    ],
+    experiments: {
+      typedRoutes: true,
+      reactCompiler: true
+    },
+    extra: {
+      router: {},
+      eas: {
+        projectId: "70b117a6-301b-4623-9bdb-80947f05bd34"
+      }
+    },
+    owner: "arrudag"
+  }
+};

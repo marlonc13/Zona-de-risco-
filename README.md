@@ -99,3 +99,22 @@ As informações meteorológicas são apenas auxiliares. Elas não publicam ocor
 - Não é necessário enviar nem copiar a pasta `node_modules`.
 - O mapa usa um componente nativo. Para testar o aplicativo, prefira Android/iPhone com Expo Go em vez do navegador.
 - O login, o armazenamento e os alertas dependem do projeto Firebase configurado em `services/firebaseConfig.js`.
+
+
+## Melhorias implementadas (outubro de 2026)
+
+- **Estatísticas detalhadas:** contagem por tipo, gravidade, situação, período e bairros, além do mapa de calor. A tela permanece rolável.
+- **Perfil:** botão de retorno ao início/mapa; o nome e a foto continuam salvos no documento `usuarios/{uid}`.
+- **Foto em Base64:** `services/imageUpload.js` converte a foto local em data URI Base64 antes de salvá-la no Firestore. O limite de arquivo é 600 KiB para manter o documento abaixo do limite do Firestore.
+- **Alertas públicos:** a aba de histórico aparece para todos. Visitantes e usuários podem consultar alertas; ações de editar, alterar situação e excluir aparecem apenas para administradores. Rascunhos não são exibidos para usuários comuns.
+- **Pontos seguros no mapa:** os documentos da coleção `abrigos` com latitude/longitude são exibidos no mapa. O balão do ponto oferece rota a pé pelo Google Maps, usando a localização atual como origem quando disponível.
+- **Pontos seguros e permissões:** o cadastro/edição/exclusão de abrigos continua restrito a administradores na interface, e as regras de `firestore.rules` restringem gravações no servidor.
+
+### Configuração local
+
+1. Copie `.env.example` para `.env` e configure seus tokens do Mapbox. Não publique o `.env`.
+2. Execute `npm install` e depois `npx expo start`.
+3. Para ver pontos seguros no mapa, cadastre documentos na coleção `abrigos` com `nome`, `situacao`, `endereco`, `latitude` e `longitude`. Use coordenadas reais e confirme a situação dos locais com fontes oficiais.
+4. A rota é aberta no Google Maps; ela não é garantia de segurança. Siga alertas e instruções das autoridades locais.
+
+**Segurança:** o ZIP não inclui o arquivo `.env`, caches do Expo, dependências instaladas nem o histórico `.git`. Configure os tokens no seu ambiente local.

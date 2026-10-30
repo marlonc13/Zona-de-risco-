@@ -11,7 +11,7 @@ import styles from '../../styles/relatorio.styles';
 import { STATUS_ALERTA, dadosStatus, statusEfetivo } from '../../services/alertLifecycle';
 
 const db = getFirestore(app);
-const TIPOS = ['Alagamento', 'Enchente', 'Deslizamento', 'Vendaval', 'Seca', 'Incêndio florestal'];
+const TIPOS = ['Alagamento', 'Enchente', 'Deslizamento', 'Vendaval', 'Incêndio florestal'];
 const GRAVIDADES = ['Atenção', 'Alerta', 'Emergência'];
 
 const escaparHtml = valor => String(valor ?? '')
