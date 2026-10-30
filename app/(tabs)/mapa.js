@@ -435,34 +435,45 @@ export default function MapScreen() {
 
         <Mapbox.UserLocation visible={!!localizacao} />
 
-        {mapaCalorAtivo && heatmapGeoJSON.features.length > 0 && (
-          <Mapbox.ShapeSource id="heatmapSource" shape={heatmapGeoJSON}>
-            <Mapbox.HeatmapLayer
-              id="heatmapLayer"
-              style={{
-                heatmapWeight: 1,
-                heatmapIntensity: 1,
-                heatmapRadius: 40,
-                heatmapOpacity: 0.8,
-                heatmapColor: [
-                  'interpolate', ['linear'], ['heatmap-density'],
-                  0, 'rgba(33,102,172,0)',
-                  0.2, '#abdda4',
-                  0.5, '#ffffbf',
-                  0.8, '#fdae61',
-                  1, '#d7191c'
-                ]
-              }}
-            />
-          </Mapbox.ShapeSource>
-        )}
+        <Mapbox.ShapeSource id="heatmapSource" shape={heatmapGeoJSON}>
+          <Mapbox.HeatmapLayer
+            id="heatmapLayer"
+            style={{
+              visibility: mapaCalorAtivo ? 'visible' : 'none',
+              heatmapWeight: ['get', 'weight'],
+              heatmapIntensity: 1,
+              heatmapRadius: 40,
+              heatmapOpacity: 0.8,
+              heatmapColor: [
+                'interpolate', ['linear'], ['heatmap-density'],
+                0, 'rgba(33,102,172,0)',
+                0.2, '#abdda4',
+                0.5, '#ffffbf',
+                0.8, '#fdae61',
+                1, '#d7191c'
+              ]
+            }}
+          />
+        </Mapbox.ShapeSource>
 
-        {!mapaCalorAtivo && areasGeoJSON.features.length > 0 && (
-          <Mapbox.ShapeSource id="areasSource" shape={areasGeoJSON}>
-            <Mapbox.FillLayer id="areasFill" style={{ fillColor: ['get', 'cor'], fillOpacity: 0.15 }} />
-            <Mapbox.LineLayer id="areasLine" style={{ lineColor: ['get', 'cor'], lineWidth: 2 }} />
-          </Mapbox.ShapeSource>
-        )}
+        <Mapbox.ShapeSource id="areasSource" shape={areasGeoJSON}>
+          <Mapbox.FillLayer 
+            id="areasFill" 
+            style={{ 
+              visibility: !mapaCalorAtivo ? 'visible' : 'none',
+              fillColor: ['get', 'cor'], 
+              fillOpacity: 0.15 
+            }} 
+          />
+          <Mapbox.LineLayer 
+            id="areasLine" 
+            style={{ 
+              visibility: !mapaCalorAtivo ? 'visible' : 'none',
+              lineColor: ['get', 'cor'], 
+              lineWidth: 2 
+            }} 
+          />
+        </Mapbox.ShapeSource>
 
         {!mapaCalorAtivo && alertasFiltrados.map(item => (
           <Mapbox.PointAnnotation
@@ -474,7 +485,7 @@ export default function MapScreen() {
             <View style={{ width: 22, height: 22, backgroundColor: dadosGravidade(item.gravidade).cor, borderRadius: 11, borderWidth: 2, borderColor: '#fff' }} />
             <Mapbox.Callout>
               <TouchableOpacity style={styles.callout} onPress={() => router.push(`/ocorrencia/${item.id}`)}>
-                <Text style={styles.calloutTitle}>{item.tipo}</Text>
+                <Text style={styles.calloutTitle}>{emojiDoTipo(item.tipo)} {item.tipo}</Text>
                 <Text style={item.oficial === true ? styles.officialBadge : styles.previousBadge}>{item.oficial === true ? '✓ ALERTA OFICIAL' : 'REGISTRO ANTERIOR'}</Text>
                 <Text style={[styles.severityText, { color: dadosGravidade(item.gravidade).cor }]}>{dadosGravidade(item.gravidade).emoji} {item.gravidade || 'Atenção'} · Área de {formatarRaio(item.raioMetros)}</Text>
                 <Text style={styles.calloutText}>{item.comentario}</Text>
