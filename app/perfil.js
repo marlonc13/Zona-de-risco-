@@ -1,7 +1,22 @@
-import { View, Text, TextInput, TouchableOpacity, Alert, Image, ScrollView } from 'react-native';
-import { useState, useEffect } from 'react';
+import { 
+  View, 
+  Text, 
+  TextInput, 
+  TouchableOpacity, 
+  Alert, 
+  Image, 
+  ScrollView, 
+  KeyboardAvoidingView, 
+  Platform, 
+  TouchableWithoutFeedback, 
+  Keyboard 
+} from 'react-native';
+import ScreenWrapper, { useScrollToSection } from '../components/screen-wrapper';
+import { useState, useEffect, useRef } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import app from '../services/firebaseConfig';
 import { EmailAuthProvider, getAuth, onAuthStateChanged, reauthenticateWithCredential, signOut, updatePassword, updateProfile } from 'firebase/auth';
 import { doc, getDoc, getFirestore, serverTimestamp, setDoc } from 'firebase/firestore';
@@ -11,8 +26,11 @@ import { uploadImage } from '../services/imageUpload';
 
 const auth = getAuth(app);
 const db = getFirestore(app);
+
 export default function Perfil() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+
   const [nome, setNome] = useState('');
   const [email, setEmail] = useState('');
   const [senhaAtual, setSenhaAtual] = useState('');
@@ -48,7 +66,7 @@ export default function Perfil() {
           setFoto(snapshot.data().photoUrl);
         }
       })
-      .catch(error => console.warn('Não foi possível carregar a foto do perfil:', error));
+      .catch(error => console.warn('Não foi possível carregar a foto:', error));
   }, [router]);
 
   const escolherFoto = async () => {
@@ -57,9 +75,12 @@ export default function Perfil() {
       Alert.alert('Permissão necessária', 'Permita acesso às fotos.');
       return;
     }
-    const result = await ImagePicker.launchImageLibraryAsync
-    ({ mediaTypes: ['images'],
-      quality: 0.2, allowsEditing: true, aspect: [1, 1] });
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.2,
+      allowsEditing: true,
+      aspect: [1, 1],
+    });
     if (!result.canceled) setFoto(result.assets[0].uri);
   };
 
@@ -98,7 +119,7 @@ export default function Perfil() {
     } catch (error) {
       console.error('Erro ao atualizar perfil:', error);
       let mensagem = `Não foi possível salvar a foto. Código: ${error.code || 'desconhecido'}.`;
-      if (error.code === 'permission-denied') mensagem = 'O Firebase bloqueou a atualização do perfil. Confira as regras da coleção usuarios.';
+      if (error.code === 'permission-denied') mensagem = 'O Firebase bloqueou a atualização do perfil.';
       Alert.alert('Erro', mensagem);
     } finally {
       setSalvandoPerfil(false);
@@ -143,59 +164,107 @@ export default function Perfil() {
     router.replace('/email-login');
   };
 
+  const { scrollRef, onLayout, rolarParaSecao } = useScrollToSection();
+
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <TouchableOpacity
-        style={[styles.secondaryButton, { alignSelf: 'stretch', alignItems: 'center', marginBottom: 16 }]}
-        onPress={() => router.replace('/mapa')}
-        accessibilityRole="button"
-        accessibilityLabel="Voltar à tela inicial"
-      >
-        <Text style={styles.secondaryText}>← Voltar para o início</Text>
-      </TouchableOpacity>
-      <Text style={styles.title}>Perfil do usuário</Text>
-      <TouchableOpacity onPress={escolherFoto} style={styles.avatar}>
-        {foto ? <Image source={{ uri: foto }} style={styles.avatarImage} /> : <Text style={styles.plus}>+</Text>}
-      </TouchableOpacity>
+    <ScreenWrapper scrollable scrollRef={scrollRef} style={styles.container} includeTop={false}>
+      <View style={{ width: '100%', alignItems: 'center' }}>
+            
+        <TouchableOpacity
+          style={[styles.secondaryButton, { alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6, marginBottom: 16 }]}
+          onPress={() => router.replace('/mapa')}
+        >
+          <Ionicons name="arrow-back" size={18} color="#1a73e8" />
+          <Text style={styles.secondaryText}>Voltar para o início</Text>
+        </TouchableOpacity>
+        <Text style={styles.title}>Perfil do usuário</Text>
+        
+        <TouchableOpacity onPress={escolherFoto} style={styles.avatar}>
+          {foto ? <Image source={{ uri: foto }} style={styles.avatarImage} /> : <Ionicons name="add" size={32} color="#1a73e8" />}
+        </TouchableOpacity>
 
-      <View style={styles.photoRow}>
-        <TouchableOpacity style={styles.secondaryButton} onPress={tirarFoto}><Text style={styles.secondaryText}>📷 Tirar foto</Text></TouchableOpacity>
-        <TouchableOpacity style={styles.secondaryButton} onPress={escolherFoto}><Text style={styles.secondaryText}>🖼️ Galeria</Text></TouchableOpacity>
+        <View style={styles.photoRow}>
+          <TouchableOpacity style={[styles.secondaryButton, { flexDirection: 'row', alignItems: 'center', gap: 6 }]} onPress={tirarFoto}>
+            <Ionicons name="camera" size={18} color="#1a73e8" />
+            <Text style={styles.secondaryText}>Tirar foto</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.secondaryButton, { flexDirection: 'row', alignItems: 'center', gap: 6 }]} onPress={escolherFoto}>
+            <Ionicons name="images" size={18} color="#1a73e8" />
+            <Text style={styles.secondaryText}>Galeria</Text>
+          </TouchableOpacity>
+        </View>
+
+        <TextInput style={styles.input} placeholder="Nome" value={nome} onChangeText={setNome} />
+        <TextInput style={[styles.input, styles.disabled]} placeholder="Email" value={email} editable={false} />
+        
+        <Text style={{ color: administrador ? '#d93025' : '#5f6368', fontWeight: '800', marginBottom: 12 }}>
+          Perfil: {administrador ? 'Administrador' : 'Usuário'}
+        </Text>
+        
+        <TouchableOpacity style={styles.button} onPress={salvarPerfil} disabled={salvandoPerfil}>
+          <Text style={styles.buttonText}>{salvandoPerfil ? 'Salvando perfil...' : 'Salvar nome e foto'}</Text>
+        </TouchableOpacity>
+
+        <Text style={styles.passwordTitle} onLayout={onLayout}>
+          Alterar senha (opcional)
+        </Text>
+        
+        <View style={styles.passwordBox}>
+          <TextInput
+            style={styles.passwordInput}
+            placeholder="Senha atual"
+            secureTextEntry={!mostrarSenhas}
+            value={senhaAtual}
+            onChangeText={setSenhaAtual}
+            onFocus={() => rolarParaSecao()}
+          />
+          <TouchableOpacity style={styles.eyeButton} onPress={() => setMostrarSenhas(atual => !atual)}>
+            <Ionicons name={mostrarSenhas ? 'eye-off' : 'eye'} size={20} color="#5f6368" />
+          </TouchableOpacity>
+        </View>
+
+        <TextInput
+          style={styles.input}
+          placeholder="Nova senha"
+          secureTextEntry={!mostrarSenhas}
+          value={novaSenha}
+          onChangeText={setNovaSenha}
+          onFocus={() => rolarParaSecao()}
+        />
+
+        <TextInput
+          style={styles.input}
+          placeholder="Confirmar nova senha"
+          secureTextEntry={!mostrarSenhas}
+          value={confirmarSenha}
+          onChangeText={setConfirmarSenha}
+          onFocus={() => rolarParaSecao()}
+        />
+
+        <TouchableOpacity style={styles.passwordButton} onPress={alterarSenha} disabled={salvandoSenha}>
+          <Text style={styles.passwordButtonText}>{salvandoSenha ? 'Alterando senha...' : 'Alterar senha'}</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={[styles.secondaryButton, { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }]} onPress={() => router.push('/endereco')}>
+          <Ionicons name="home" size={18} color="#1a73e8" />
+          <Text style={styles.secondaryText}>Adicionar ou mudar endereço</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={[styles.secondaryButton, { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }]} onPress={() => router.push('/familiares')}>
+          <Ionicons name="star" size={18} color="#1a73e8" />
+          <Text style={styles.secondaryText}>Acompanhar endereço de pessoas</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={[styles.switchAccountButton, { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }]} onPress={trocarConta}>
+          <MaterialCommunityIcons name="swap-horizontal" size={18} color="#d93025" />
+          <Text style={styles.switchAccountText}>Trocar de conta</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={[styles.logoutButton, { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }]} onPress={sair}>
+          <Ionicons name="log-out-outline" size={18} color="#fff" />
+          <Text style={styles.logoutText}>Sair da conta</Text>
+        </TouchableOpacity>
       </View>
-
-      <TextInput style={styles.input} placeholder="Nome" value={nome} onChangeText={setNome} />
-      <TextInput style={[styles.input, styles.disabled]} placeholder="Email" value={email} editable={false} />
-      <Text style={{ color: administrador ? '#d93025' : '#5f6368', fontWeight: '800', marginBottom: 12 }}>
-        Perfil: {administrador ? 'Administrador' : 'Usuário'}
-      </Text>
-      <TouchableOpacity style={styles.button} onPress={salvarPerfil} disabled={salvandoPerfil}>
-        <Text style={styles.buttonText}>{salvandoPerfil ? 'Salvando perfil...' : 'Salvar nome e foto'}</Text>
-      </TouchableOpacity>
-
-      <Text style={styles.passwordTitle}>Alterar senha (opcional)</Text>
-      <View style={styles.passwordBox}><TextInput style={styles.passwordInput} placeholder="Senha atual" secureTextEntry={!mostrarSenhas} value={senhaAtual} onChangeText={setSenhaAtual} /><TouchableOpacity style={styles.eyeButton} onPress={() => setMostrarSenhas(atual => !atual)}><Text style={styles.eyeText}>{mostrarSenhas ? '🙈' : '👁️'}</Text></TouchableOpacity></View>
-      <TextInput style={styles.input} placeholder="Nova senha" secureTextEntry={!mostrarSenhas} value={novaSenha} onChangeText={setNovaSenha} />
-      <TextInput style={styles.input} placeholder="Confirmar nova senha" secureTextEntry={!mostrarSenhas} value={confirmarSenha} onChangeText={setConfirmarSenha} />
-
-      <TouchableOpacity style={styles.passwordButton} onPress={alterarSenha} disabled={salvandoSenha}>
-        <Text style={styles.passwordButtonText}>{salvandoSenha ? 'Alterando senha...' : 'Alterar senha'}</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity style={styles.secondaryButton} onPress={() => router.push('/endereco')}>
-        <Text style={styles.secondaryText}>🏠 Adicionar ou mudar endereço</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity style={styles.secondaryButton} onPress={() => router.push('/familiares')}>
-        <Text style={styles.secondaryText}>⭐ Acompanhar endereço de pessoas</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity style={styles.switchAccountButton} onPress={trocarConta}>
-        <Text style={styles.switchAccountText}>🔄 Trocar de conta</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity style={styles.logoutButton} onPress={sair}>
-        <Text style={styles.logoutText}>Sair da conta</Text>
-      </TouchableOpacity>
-    </ScrollView>
+    </ScreenWrapper>
   );
 }
