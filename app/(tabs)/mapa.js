@@ -33,13 +33,19 @@ const REGIAO_PADRAO = {
 };
 
 const TIPOS_ALERTA = [
-  { label: ' Todos', renderIcon: (color) => <Entypo name="map" size={18} color={color} />, cor: '#1a73e8' },
-  { label: ' Alagamento', renderIcon: (color) => <MaterialCommunityIcons name="water" size={18} color={color} />, cor: '#1a73e8' },
-  { label: ' Enchente', renderIcon: (color) => <Ionicons name="rainy" size={18} color={color} />, cor: '#0b57d0' },
-  { label: ' Deslizamento', renderIcon: (color) => <FontAwesome5 name="mountain" size={18} color={color} />, cor: '#e8710a' },
-  { label: ' Vendaval', renderIcon: (color) => <Feather name="wind" size={18} color={color} />, cor: '#7b1fa2' },
-  { label: ' Incêndio florestal', renderIcon: (color) => <MaterialCommunityIcons name="fire" size={18} color={color} />, cor: '#d93025' },
+  { label: 'Todos', emoji: '🗺️', renderIcon: (color) => <Entypo name="map" size={18} color={color} />, cor: '#1a73e8' },
+  { label: 'Alagamento', emoji: '🌊', renderIcon: (color) => <MaterialCommunityIcons name="water" size={18} color={color} />, cor: '#1a73e8' },
+  { label: 'Enchente', emoji: '🌧️', renderIcon: (color) => <Ionicons name="rainy" size={18} color={color} />, cor: '#0b57d0' },
+  { label: 'Deslizamento', emoji: '⛰️', renderIcon: (color) => <FontAwesome5 name="mountain" size={18} color={color} />, cor: '#e8710a' },
+  { label: 'Vendaval', emoji: '💨', renderIcon: (color) => <Feather name="wind" size={18} color={color} />, cor: '#7b1fa2' },
+  { label: 'Incêndio florestal', emoji: '🔥', renderIcon: (color) => <MaterialCommunityIcons name="fire" size={18} color={color} />, cor: '#d93025' },
 ];
+
+const emojiDoTipo = (tipo) => {
+  if (!tipo) return '⚠️';
+  const encontrado = TIPOS_ALERTA.find(t => t.label.toLowerCase().includes(tipo.toLowerCase()) || tipo.toLowerCase().includes(t.label.toLowerCase()));
+  return encontrado?.emoji || '⚠️';
+};
 
 const OPCOES_TEMPO = [
   { label: '30 Minutos', valor: 30 * 60 * 1000 },
@@ -48,7 +54,14 @@ const OPCOES_TEMPO = [
 ];
 
 function iconeDoTipo(tipo, cor = '#5f6368') {
-  const encontrado = TIPOS_ALERTA.find(item => item.label.trim() === tipo?.trim());
+  if (!tipo) return <Entypo name="location-pin" size={18} color={cor} />;
+  
+  const tipoNorm = normalizarTexto(tipo);
+  const encontrado = TIPOS_ALERTA.find(item => {
+    const labelNorm = normalizarTexto(item.label);
+    return labelNorm.includes(tipoNorm) || tipoNorm.includes(labelNorm);
+  });
+  
   return encontrado ? encontrado.renderIcon(cor) : <Entypo name="location-pin" size={18} color={cor} />;
 }
 
@@ -60,23 +73,30 @@ function comTimeout(promise, ms = 25000) {
 }
 
 function gerarCirculoGeoJSON(centroLong, centroLat, raioMetros, id, corHex) {
+  const lon = Number(centroLong);
+  const lat = Number(centroLat);
+  if (!Number.isFinite(lon) || !Number.isFinite(lat)) return null;
+
   const coords = [];
   const raioTerra = 6378137;
+  const raio = raioMetros || 1000;
+
   for (let i = 0; i <= 64; i++) {
     const angulo = (i * 360) / 64;
     const theta = angulo * (Math.PI / 180);
-    const latRad = centroLat * (Math.PI / 180);
-    const dx = raioMetros * Math.cos(theta);
-    const dy = raioMetros * Math.sin(theta);
-    const lat = centroLat + (dy / raioTerra) * (180 / Math.PI);
-    const lon = centroLong + (dx / (raioTerra * Math.cos(latRad))) * (180 / Math.PI);
-    coords.push([lon, lat]);
+    const latRad = lat * (Math.PI / 180);
+    const dx = raio * Math.cos(theta);
+    const dy = raio * Math.sin(theta);
+    const latPonto = lat + (dy / raioTerra) * (180 / Math.PI);
+    const lonPonto = lon + (dx / (raioTerra * Math.cos(latRad))) * (180 / Math.PI);
+    coords.push([lonPonto, latPonto]);
   }
+
   return {
     type: 'Feature',
-    id: id,
+    id: String(id),
     geometry: { type: 'Polygon', coordinates: [coords] },
-    properties: { cor: corHex }
+    properties: { cor: corHex || '#1a73e8' }
   };
 }
 
@@ -94,7 +114,7 @@ export default function MapScreen() {
   const [pontosSeguros, setPontosSeguros] = useState([]);
   const [historicoAlertas, setHistoricoAlertas] = useState([]);
   const [mapaCalorAtivo, setMapaCalorAtivo] = useState(false);
-  const [filtroAtivo, setFiltroAtivo] = useState(' Todos');
+  const [filtroAtivo, setFiltroAtivo] = useState('Todos');
   const [modalVisivel, setModalVisivel] = useState(false);
   const [coordenadaSelecionada, setCoordenadaSelecionada] = useState(null);
   const [tipoSelecionado, setTipoSelecionado] = useState('Alagamento');
@@ -257,16 +277,31 @@ export default function MapScreen() {
     }
   }, [emergenciasProximas]);
 
+  const normalizarTexto = (texto = '') => 
+    texto.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+
   const alertasFiltrados = useMemo(() => {
     if (filtroAtivo === 'Todos') return alertas;
-    return alertas.filter(item => item.tipo === filtroAtivo);
+    
+    const filtroNorm = normalizarTexto(filtroAtivo);
+
+    return alertas.filter(item => {
+      const tipoNorm = normalizarTexto(item.tipo);
+      return tipoNorm.includes(filtroNorm) || filtroNorm.includes(tipoNorm);
+    });
   }, [alertas, filtroAtivo]);
 
   const heatmapGeoJSON = useMemo(() => {
+    const filtroNorm = normalizarTexto(filtroAtivo);
+
     const features = historicoAlertas
       .filter(item => statusEfetivo(item) !== 'rascunho')
       .filter(item => Number.isFinite(Number(item.latitude)) && Number.isFinite(Number(item.longitude)))
-      .filter(item => filtroAtivo === 'Todos' || item.tipo === filtroAtivo)
+      .filter(item => {
+        if (filtroAtivo === 'Todos') return true;
+        const tipoNorm = normalizarTexto(item.tipo);
+        return tipoNorm.includes(filtroNorm) || filtroNorm.includes(tipoNorm);
+      })
       .map(item => ({
         type: 'Feature',
         geometry: { type: 'Point', coordinates: [Number(item.longitude), Number(item.latitude)] },
@@ -276,11 +311,16 @@ export default function MapScreen() {
   }, [historicoAlertas, filtroAtivo]);
 
   const areasGeoJSON = useMemo(() => {
-    const features = alertasFiltrados.map(item => 
-      gerarCirculoGeoJSON(item.longitude, item.latitude, item.raioMetros || 1000, item.id, dadosGravidade(item.gravidade).cor)
-    );
-    return { type: 'FeatureCollection', features };
-  }, [alertasFiltrados]);
+  const features = alertasFiltrados
+    .filter(item => Number.isFinite(Number(item.longitude)) && Number.isFinite(Number(item.latitude)))
+    .map(item => {
+      const cor = dadosGravidade(item?.gravidade)?.cor || '#1a73e8';
+      return gerarCirculoGeoJSON(item.longitude, item.latitude, item.raioMetros, item.id, cor);
+    })
+    .filter(Boolean);
+
+  return { type: 'FeatureCollection', features };
+}, [alertasFiltrados]);
 
   const exigirLogin = () => {
     if (!administrador) {
@@ -301,7 +341,7 @@ export default function MapScreen() {
     setComentario('');
     setBairro('');
     setFoto(null);
-    setTipoSelecionado(' Alagamento');
+    setTipoSelecionado('Alagamento');
     setTempoSelecionado(null);
     setGravidadeSelecionada('Atenção');
     setRaioSelecionado(1000);
@@ -316,7 +356,7 @@ export default function MapScreen() {
     setComentario('');
     setBairro('');
     setFoto(null);
-    setTipoSelecionado(' Alagamento');
+    setTipoSelecionado('Alagamento');
     setTempoSelecionado(null);
     setGravidadeSelecionada('Atenção');
     setRaioSelecionado(1000);
@@ -399,6 +439,9 @@ export default function MapScreen() {
   };
 
   const abrirPerfil = () => {
+    console.log('Estado do usuário:', usuario);
+    console.log('É administrador?:', administrador);
+
     if (!usuario) return router.push('/email-login');
     router.push(administrador ? '/admin' : '/perfil');
   };
@@ -547,7 +590,7 @@ export default function MapScreen() {
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={[styles.filterBar, { marginTop: insets.top - 35 }]}>
         {TIPOS_ALERTA.map(tipo => (
-          <TouchableOpacity key={tipo.label} onPress={() => setFiltroAtivo(tipo.label)} style={[styles.chip, { flexDirection: 'row', alignItems: 'center' }, filtroAtivo === tipo.label && { backgroundColor: tipo.cor }]}>
+          <TouchableOpacity key={tipo.label} onPress={() => setFiltroAtivo(tipo.label)} style={[styles.chip, { flexDirection: 'row', alignItems: 'center', gap: 2 }, filtroAtivo === tipo.label && { backgroundColor: tipo.cor }]}>
             {tipo.renderIcon(filtroAtivo === tipo.label ? '#fff' : '#5f6368')}
             <Text style={[styles.chipText, filtroAtivo === tipo.label && { color: '#fff' }]}>{tipo.label}</Text>
           </TouchableOpacity>
@@ -592,7 +635,7 @@ export default function MapScreen() {
 
               <Text style={styles.sectionLabel}>Selecione o tipo:</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
-                {TIPOS_ALERTA.filter(t => t.label !== ' Todos').map(tipo => (
+                {TIPOS_ALERTA.filter(t => t.label !== 'Todos').map(tipo => (
                   <TouchableOpacity key={tipo.label} onPress={() => setTipoSelecionado(tipo.label)} style={[styles.tipoChip, { flexDirection: 'row', alignItems: 'center' }, tipoSelecionado === tipo.label && { backgroundColor: tipo.cor }]}>
                     {tipo.renderIcon(tipoSelecionado === tipo.label ? '#fff' : '#5f6368')}
                     <Text style={[styles.tipoText, tipoSelecionado === tipo.label && { color: '#fff' }]}>{tipo.label}</Text>

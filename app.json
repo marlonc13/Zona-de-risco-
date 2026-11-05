@@ -7,6 +7,7 @@
     "icon": "./assets/images/splash-icon.png",
     "scheme": "areaderisco",
     "userInterfaceStyle": "automatic",
+    "backgroundColor": "transparent",
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
@@ -16,6 +17,7 @@
       }
     },
     "android": {
+      "softwareKeyboardLayoutMode": "resize",
       "package": "com.alinelasneau.areaderisco",
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
