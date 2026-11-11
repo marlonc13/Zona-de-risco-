@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, Alert, ScrollView, Modal, TextInput, Image, Linking } from 'react-native';
+import { View, Text, TouchableOpacity, Alert, ScrollView, Modal, TextInput, Image, Linking, TouchableWithoutFeedback, Keyboard, KeyboardAvoidingView, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -16,6 +16,7 @@ import { GRAVIDADES, RAIOS_ALERTA, dadosGravidade, formatarRaio, orientacaoDoRis
 import { buscarClimaAtual } from '../../services/weatherService';
 import { CHECKLIST_EVACUACAO, CONTATOS_EMERGENCIA, INSTRUCOES_EVACUACAO } from '../../services/emergencyGuidance';
 import { uploadImage } from '../../services/imageUpload';
+import CameraCaptura from '../../components/camera-captura';
 import { apareceNoMapa, statusEfetivo } from '../../services/alertLifecycle';
 import { compartilharAlertaWhatsApp } from '../../services/shareAlert';
 
@@ -121,6 +122,7 @@ export default function MapScreen() {
   const [comentario, setComentario] = useState('');
   const [bairro, setBairro] = useState('');
   const [foto, setFoto] = useState(null);
+  const [cameraVisivel, setCameraVisivel] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [tempoSelecionado, setTempoSelecionado] = useState(null); 
   const [gravidadeSelecionada, setGravidadeSelecionada] = useState('Atenção');
@@ -369,12 +371,7 @@ export default function MapScreen() {
       .catch(() => {});
   };
 
-  const tirarFoto = async () => {
-    const permissao = await ImagePicker.requestCameraPermissionsAsync();
-    if (!permissao.granted) return;
-    const result = await ImagePicker.launchCameraAsync({ quality: 0.15, allowsEditing: true, aspect: [4, 3] });
-    if (!result.canceled) setFoto(result.assets[0].uri);
-  };
+  const tirarFoto = () => setCameraVisivel(true);
 
   const escolherFoto = async () => {
     const permissao = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -668,6 +665,12 @@ export default function MapScreen() {
             </ScrollView>
           </TouchableOpacity>
         </TouchableOpacity>
+        {/* Fica dentro do Modal do alerta para abrir por cima dele. */}
+        <CameraCaptura
+          visivel={cameraVisivel}
+          onFechar={() => setCameraVisivel(false)}
+          onFotoTirada={setFoto}
+        />
       </Modal>
 
       {/* Modal de Contatos de Emergência (SOS) */}

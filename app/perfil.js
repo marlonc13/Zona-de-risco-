@@ -23,6 +23,7 @@ import { doc, getDoc, getFirestore, serverTimestamp, setDoc } from 'firebase/fir
 import styles from '../styles/perfil.styles';
 import { observarStatusAdministrador } from '../services/accessControl';
 import { uploadImage } from '../services/imageUpload';
+import CameraCaptura from '../components/camera-captura';
 
 const auth = getAuth(app);
 const db = getFirestore(app);
@@ -41,6 +42,7 @@ export default function Perfil() {
   const [salvandoPerfil, setSalvandoPerfil] = useState(false);
   const [salvandoSenha, setSalvandoSenha] = useState(false);
   const [administrador, setAdministrador] = useState(false);
+  const [cameraVisivel, setCameraVisivel] = useState(false);
 
   useEffect(() => {
     let pararAdmin = () => {};
@@ -84,15 +86,7 @@ export default function Perfil() {
     if (!result.canceled) setFoto(result.assets[0].uri);
   };
 
-  const tirarFoto = async () => {
-    const permissao = await ImagePicker.requestCameraPermissionsAsync();
-    if (!permissao.granted) {
-      Alert.alert('Permissão necessária', 'Permita acesso à câmera.');
-      return;
-    }
-    const result = await ImagePicker.launchCameraAsync({ quality: 0.1, allowsEditing: true, aspect: [1, 1] });
-    if (!result.canceled) setFoto(result.assets[0].uri);
-  };
+  const tirarFoto = () => setCameraVisivel(true);
 
   const salvarPerfil = async () => {
     const user = auth.currentUser;
@@ -265,6 +259,12 @@ export default function Perfil() {
           <Text style={styles.logoutText}>Sair da conta</Text>
         </TouchableOpacity>
       </View>
+      <CameraCaptura
+        visivel={cameraVisivel}
+        cameraInicial="front"
+        onFechar={() => setCameraVisivel(false)}
+        onFotoTirada={setFoto}
+      />
     </ScreenWrapper>
   );
 }

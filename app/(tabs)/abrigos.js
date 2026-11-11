@@ -12,6 +12,7 @@ import { observarStatusAdministrador } from '../../services/accessControl';
 import { distanciaKm } from '../../services/proximityNotifications';
 import { pesquisarEnderecos } from '../../services/addressSearch';
 import { uploadImage } from '../../services/imageUpload';
+import CameraCaptura from '../../components/camera-captura';
 import app, { auth } from '../../services/firebaseConfig';
 import styles from '../../styles/abrigos.styles';
 
@@ -38,6 +39,7 @@ export default function AbrigosScreen() {
   const [localizacao, setLocalizacao] = useState(null);
   const [filtro, setFiltro] = useState('Todos');
   const [modalVisivel, setModalVisivel] = useState(false);
+  const [cameraVisivel, setCameraVisivel] = useState(false);
   const [formulario, setFormulario] = useState(FORMULARIO_VAZIO);
   const [editandoId, setEditandoId] = useState(null);
   const [salvando, setSalvando] = useState(false);
@@ -140,12 +142,7 @@ export default function AbrigosScreen() {
     if (!resultado.canceled) alterarCampo('fotoUrl', resultado.assets[0].uri);
   };
 
-  const tirarFoto = async () => {
-    const permissao = await ImagePicker.requestCameraPermissionsAsync();
-    if (!permissao.granted) return Alert.alert('Permissão necessária', 'Autorize o acesso à câmera.');
-    const resultado = await ImagePicker.launchCameraAsync({ quality: 0.2, allowsEditing: true, aspect: [16, 9] });
-    if (!resultado.canceled) alterarCampo('fotoUrl', resultado.assets[0].uri);
-  };
+  const tirarFoto = () => setCameraVisivel(true);
 
   const salvarAbrigo = async () => {
     if (!administrador) return Alert.alert('Acesso negado', 'Somente administradores podem cadastrar abrigos.');
@@ -342,6 +339,12 @@ export default function AbrigosScreen() {
             </ScrollView>
           </View>
         </View>
+        {/* Fica dentro do Modal do abrigo para abrir por cima dele. */}
+        <CameraCaptura
+          visivel={cameraVisivel}
+          onFechar={() => setCameraVisivel(false)}
+          onFotoTirada={uri => alterarCampo('fotoUrl', uri)}
+        />
       </Modal>
     </View>
   );
