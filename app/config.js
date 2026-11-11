@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { deleteUser } from 'firebase/auth';
-import { Entypo, Ionicons, MaterialIcons, FontAwesome5, MaterialCommunityIcons, Feather, FontAwesome, FontAwesome6 } from '@expo/vector-icons';
+import { Entypo, FontAwesome5, MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { auth } from '../services/firebaseConfig';
 import { Colors } from '../constants/theme';

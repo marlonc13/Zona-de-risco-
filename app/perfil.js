@@ -4,15 +4,10 @@ import {
   TextInput, 
   TouchableOpacity, 
   Alert, 
-  Image, 
-  ScrollView, 
-  KeyboardAvoidingView, 
-  Platform, 
-  TouchableWithoutFeedback, 
-  Keyboard 
+  Image
 } from 'react-native';
 import ScreenWrapper, { useScrollToSection } from '../components/screen-wrapper';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
@@ -163,14 +158,7 @@ export default function Perfil() {
   return (
     <ScreenWrapper scrollable scrollRef={scrollRef} style={styles.container} includeTop={false}>
       <View style={{ width: '100%', alignItems: 'center' }}>
-            
-        <TouchableOpacity
-          style={[styles.secondaryButton, { alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6, marginBottom: 16 }]}
-          onPress={() => router.replace('/mapa')}
-        >
-          <Ionicons name="arrow-back" size={18} color="#1a73e8" />
-          <Text style={styles.secondaryText}>Voltar para o início</Text>
-        </TouchableOpacity>
+
         <Text style={styles.title}>Perfil do usuário</Text>
         
         <TouchableOpacity onPress={escolherFoto} style={styles.avatar}>

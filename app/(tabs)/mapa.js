@@ -1,10 +1,10 @@
-import { View, Text, TouchableOpacity, Alert, ScrollView, Modal, TextInput, Image, Linking, TouchableWithoutFeedback, Keyboard, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, Alert, ScrollView, Modal, TextInput, Image, Linking, KeyboardAvoidingView, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp, doc } from 'firebase/firestore';
-import { Entypo, Ionicons, MaterialIcons, FontAwesome5, MaterialCommunityIcons, Feather, FontAwesome, FontAwesome6 } from '@expo/vector-icons';
+import { Entypo, Ionicons, FontAwesome5, MaterialCommunityIcons, Feather, FontAwesome, FontAwesome6 } from '@expo/vector-icons';
 
 import Mapbox from '@rnmapbox/maps';
 import * as Location from 'expo-location';
@@ -12,9 +12,8 @@ import * as ImagePicker from 'expo-image-picker';
 
 import { isAdminUser, observarStatusAdministrador } from '../../services/accessControl';
 import { avisarAlertasProximos, distanciaKm } from '../../services/proximityNotifications';
-import { GRAVIDADES, RAIOS_ALERTA, dadosGravidade, formatarRaio, orientacaoDoRisco } from '../../services/riskGuidance';
+import { RAIOS_ALERTA, dadosGravidade, formatarRaio, orientacaoDoRisco } from '../../services/riskGuidance';
 import { buscarClimaAtual } from '../../services/weatherService';
-import { CHECKLIST_EVACUACAO, CONTATOS_EMERGENCIA, INSTRUCOES_EVACUACAO } from '../../services/emergencyGuidance';
 import { uploadImage } from '../../services/imageUpload';
 import CameraCaptura from '../../components/camera-captura';
 import { apareceNoMapa, statusEfetivo } from '../../services/alertLifecycle';
@@ -621,9 +620,17 @@ export default function MapScreen() {
 
       {/* Modal de Nova Ocorrência */}
       <Modal visible={modalVisivel} transparent animationType="slide" onRequestClose={() => setModalVisivel(false)}>
-        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setModalVisivel(false)}>
-          <TouchableOpacity activeOpacity={1} style={styles.modalBox}>
-            <ScrollView showsVerticalScrollIndicator={false}>
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setModalVisivel(false)}>
+            <TouchableOpacity activeOpacity={1} style={styles.modalBox}>
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                contentContainerStyle={{ paddingBottom: 20 }}
+              >
               <View style={styles.dragIndicator} />
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                 <Text style={styles.modalTitle}>Nova ocorrência</Text>
@@ -662,10 +669,11 @@ export default function MapScreen() {
                 <TouchableOpacity style={[styles.modalButton, styles.cancelButton]} onPress={() => setModalVisivel(false)}><Text style={styles.cancelText}>Cancelar</Text></TouchableOpacity>
                 <TouchableOpacity style={[styles.modalButton, styles.saveButton]} onPress={() => salvarMarcacao('ativo')} disabled={salvando}><Text style={styles.saveText}>{salvando ? 'Salvando...' : 'Publicar'}</Text></TouchableOpacity>
               </View>
-            </ScrollView>
+              </ScrollView>
+            </TouchableOpacity>
           </TouchableOpacity>
-        </TouchableOpacity>
-        {/* Fica dentro do Modal do alerta para abrir por cima dele. */}
+        </KeyboardAvoidingView>
+
         <CameraCaptura
           visivel={cameraVisivel}
           onFechar={() => setCameraVisivel(false)}

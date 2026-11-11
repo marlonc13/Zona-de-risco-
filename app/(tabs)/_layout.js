@@ -1,6 +1,5 @@
 import { Tabs } from 'expo-router';
-import React, { useEffect, useState } from 'react';
-import { Text } from 'react-native';
+import { useEffect, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Entypo, FontAwesome5, Octicons } from '@expo/vector-icons';
 
@@ -46,7 +45,7 @@ export default function TabLayout() {
         options={{
           title: 'Mapa',
           tabBarIcon: ({ color }) => (
-            <Entypo name="map" size={24} color={color} />
+            <Entypo name="map" size={24} color="black" />
           ),
         }}
       />
@@ -77,7 +76,7 @@ export default function TabLayout() {
         options={{
           title: 'Alertas',
           tabBarIcon: ({ color }) => (
-            <Entypo name="warning" size={24} color={color} />
+            <Entypo name="warning" size={24} color="black" />
           ),
         }}
       />

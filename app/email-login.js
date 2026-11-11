@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ImageBackground, Alert, ActivityIndicator, KeyboardAvoidingView, ScrollView, Platform, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -17,31 +17,80 @@ export default function EmailLogin() {
   const [mostrarSenha, setMostrarSenha] = useState(false);
   const [carregando, setCarregando] = useState(false);
 
-  const entrarNoApp = async (user) => {
-    await AsyncStorage.setItem('userToken', await user.getIdToken());
-    await AsyncStorage.setItem('userName', user.displayName || nome.trim() || 'Usuário');
-    await AsyncStorage.setItem('userEmail', user.email || email.trim());
+  const chaveBiometria = (uid) => `biometriaAtiva:${uid}`;
+
+  const perguntarAtivarBiometria = () =>
+    new Promise((resolve) => {
+      Alert.alert(
+        'Ativar biometria?',
+        'Deseja usar a biometria do celular para proteger essa conta nas próximas entradas?',
+        [
+          { text: 'Agora não', style: 'cancel', onPress: () => resolve(false) },
+          { text: 'Ativar', onPress: () => resolve(true) },
+        ],
+        { cancelable: false }
+      );
+    });
+
+const entrarNoApp = async (user) => {
+  await AsyncStorage.setItem('userToken', await user.getIdToken());
+  await AsyncStorage.setItem('userName', user.displayName || nome.trim() || 'Usuário');
+  await AsyncStorage.setItem('userEmail', user.email || email.trim());
+
+  const administrador = await verificarAdministrador(user);
+  const destino = administrador ? '/admin' : '/mapa';
+  const chave = chaveBiometria(user.uid);
+  const valor = await AsyncStorage.getItem(chave); // 'true' | 'false' | null
+
+  // Conta que nunca ativou/recusou: pergunta uma única vez
+  let exigirBiometria = valor === 'true';
+  let ativandoAgora = false;
+
+  if (valor === null) {
+    ativandoAgora = await perguntarAtivarBiometria();
+    if (!ativandoAgora) {
+      await AsyncStorage.setItem(chave, 'false');
+      await AsyncStorage.setItem('biometriaAtiva', 'false');
+      router.replace(destino);
+      return;
+    }
+    exigirBiometria = true;
+  }
+
+  // Conta que recusou antes: entra direto, sem biometria
+  if (!exigirBiometria) {
+    await AsyncStorage.setItem('biometriaAtiva', 'false');
+    router.replace(destino);
+    return;
+  }
+
+  const resultado = await authenticateWithBiometrics();
+
+  if (resultado?.success) {
+    await AsyncStorage.setItem(chave, 'true');
     await AsyncStorage.setItem('biometriaAtiva', 'true');
+    router.replace(destino);
+    return;
+  }
 
-    const [resultado, administrador] = await Promise.all([
-      authenticateWithBiometrics(),
-      verificarAdministrador(user),
-    ]);
+  if (resultado?.message === 'Sem suporte a biometria' || resultado?.message === 'Cadastre biometria no celular') {
+    Alert.alert('Biometria não disponível', 'O login foi feito. Cadastre biometria no celular para usar essa proteção nas próximas entradas.');
+    await AsyncStorage.setItem('biometriaAtiva', 'false');
+    router.replace(destino);
+    return;
+  }
 
-    if (resultado?.success) {
-      router.replace(administrador ? '/admin' : '/mapa');
-      return;
-    }
+  // Estava ativando agora e cancelou: entra sem ativar
+  if (ativandoAgora) {
+    await AsyncStorage.setItem('biometriaAtiva', 'false');
+    router.replace(destino);
+    return;
+  }
 
-    if (resultado?.message === 'Sem suporte a biometria' || resultado?.message === 'Cadastre biometria no celular') {
-      Alert.alert('Biometria não disponível', 'O login foi feito. Cadastre biometria no celular para usar essa proteção nas próximas entradas.');
-      router.replace(administrador ? '/admin' : '/mapa');
-      return;
-    }
-
-    await signOut(auth);
-    Alert.alert('Biometria necessária', 'Para entrar, confirme sua biometria.');
-  };
+  // Conta que já tinha biometria ativa e falhou: bloqueia
+  await signOut(auth);
+  Alert.alert('Biometria necessária', 'Para entrar, confirme sua biometria.');
+};
 
   const enviar = async () => {
     const emailLimpo = email.trim().toLowerCase();

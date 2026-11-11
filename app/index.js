@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { View, Image, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import styles from '../styles/index.styles';

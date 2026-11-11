@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { collection, getFirestore, onSnapshot } from 'firebase/firestore';
-import { Entypo, Ionicons, MaterialIcons, FontAwesome5, MaterialCommunityIcons, Feather, FontAwesome, FontAwesome6 } from '@expo/vector-icons';
+import { Entypo, Ionicons, FontAwesome5, MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { isMainAdmin, observarStatusAdministrador } from '../services/accessControl';
 import { statusEfetivo } from '../services/alertLifecycle';

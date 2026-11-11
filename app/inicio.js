@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, ImageBackground, Image, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -11,8 +11,6 @@ export default function Inicio() {
   const [verificando, setVerificando] = useState(true)
 
   useEffect(() => {
-    const timer = setTimeout(() => setVerificando(false),  3000);
-
     const unsunscribe = onAuthStateChanged(auth, async(user) => {
       if (user) {
         try {
