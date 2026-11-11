@@ -77,7 +77,7 @@ export default function Perfil() {
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
-      quality: 0.2,
+      quality: 0.1,
       allowsEditing: true,
       aspect: [1, 1],
     });
@@ -90,7 +90,7 @@ export default function Perfil() {
       Alert.alert('Permissão necessária', 'Permita acesso à câmera.');
       return;
     }
-    const result = await ImagePicker.launchCameraAsync({ quality: 0.2, allowsEditing: true, aspect: [1, 1] });
+    const result = await ImagePicker.launchCameraAsync({ quality: 0.1, allowsEditing: true, aspect: [1, 1] });
     if (!result.canceled) setFoto(result.assets[0].uri);
   };
 
@@ -106,7 +106,7 @@ export default function Perfil() {
         photoUrl = await uploadImage(foto);
       }
 
-      const nomeFinal = nome.trim() || 'Usuário';
+      const nomeFinal = (nome || '').trim() || 'Usuário';
       await updateProfile(user, { displayName: nomeFinal });
       await setDoc(doc(db, 'usuarios', user.uid), {
         nome: nomeFinal,

@@ -3,7 +3,7 @@ import { auth } from './firebaseConfig';
 
 // O projeto não possui um bucket do Firebase Storage. Para manter o app no
 // plano gratuito, a foto comprimida é guardada como data URI no Firestore.
-const TAMANHO_MAXIMO_BYTES = 600 * 1024;
+const TAMANHO_MAXIMO_BYTES = 300 * 1024;
 
 function descobrirContentType(uri) {
   const caminhoSemQuery = uri.split('?')[0].toLowerCase();
