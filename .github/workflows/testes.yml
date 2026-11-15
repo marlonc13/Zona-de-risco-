@@ -30,5 +30,21 @@ jobs:
       - name: Instalar dependências
         run: npm ci
 
-      - name: Rodar os testes
+      - name: Rodar os testes do app
         run: npm test -- --ci
+
+      # As regras do Firestore são testadas no emulador do Firebase, que precisa de Java
+      - name: Instalar o Java (emulador do Firebase)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Reaproveitar o emulador já baixado
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/firebase/emulators
+          key: emulador-firebase-${{ hashFiles('package.json') }}
+
+      - name: Rodar os testes das regras do Firestore
+        run: npm run test:regras
