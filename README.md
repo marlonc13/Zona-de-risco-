@@ -93,9 +93,9 @@ Alertas ativos ou em monitoramento são **encerrados automaticamente** quando ch
 
 ### Conta e perfil
 
-- Login com e-mail e senha, com opção de proteger as próximas entradas com a **biometria** do celular.
+- Login com e-mail e senha. Com a **biometria** ativada, o app pede a digital ou o rosto sempre que é aberto com a conta conectada.
 - Foto de perfil (câmera ou galeria, ao tocar na foto) e nome salvos no documento `usuarios/{uid}`.
-- Em **Configurações**: cadastro da residência, troca de senha (com confirmação da senha atual) e exclusão da conta.
+- Em **Configurações**: cadastro da residência, troca de senha (com confirmação da senha atual), ativação da biometria ao abrir o app e exclusão da conta (que também apaga os dados do perfil).
 - **Sair da conta** volta para a tela inicial, onde é possível entrar como visitante ou fazer login.
 
 ### Aparência e acessibilidade
