@@ -240,7 +240,7 @@ npx expo-doctor
 
 ### Testes automatizados
 
-Os testes ficam em `__tests__/` e cobrem as regras principais do app: ciclo de vida das ocorrências (o que aparece no mapa), controle de administradores, avisos de alertas próximos, orientações de risco e a opção "Letras grandes". Eles não usam o Firebase real nem precisam de celular.
+Os testes ficam em `__tests__/` e cobrem as regras principais do app: ciclo de vida das ocorrências (o que aparece no mapa), controle de administradores, avisos de alertas próximos, orientações de risco e a opção "Letras grandes". Em `__tests__/telas/` ficam os testes das telas mais importantes, feitos com a [Testing Library](https://callstack.github.io/react-native-testing-library/): o modal de nova ocorrência no mapa (gravidade, rascunho e aviso de emergência), o modal "Alterar situação" e o selo de validade em Alertas, e a biometria ao abrir o app. Eles não usam o Firebase real nem precisam de celular.
 
 As **regras do Firestore** (`firestore.rules`) têm testes próprios em `__tests__/regras/`, executados no emulador do Firebase: eles conferem que visitantes e usuários comuns não publicam alertas nem gerenciam abrigos, que cada pessoa só acessa o próprio perfil, que administradores desativados perdem o acesso e que só a administradora principal cadastra administradores. Na primeira execução o emulador é baixado automaticamente.
 
