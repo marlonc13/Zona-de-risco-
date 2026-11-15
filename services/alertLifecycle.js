@@ -1,9 +1,9 @@
 export const STATUS_ALERTA = [
-  { id: 'rascunho', label: 'Rascunho', emoji: '📝', cor: '#5f6368', fundo: '#f1f3f4' },
-  { id: 'ativo', label: 'Ativa', emoji: '🔴', cor: '#b3261e', fundo: '#fce8e6' },
-  { id: 'monitoramento', label: 'Em monitoramento', emoji: '👁️', cor: '#0b57d0', fundo: '#e8f0fe' },
-  { id: 'controlado', label: 'Controlada', emoji: '🛡️', cor: '#8a3b00', fundo: '#fff4e5' },
-  { id: 'encerrado', label: 'Encerrada', emoji: '✅', cor: '#137333', fundo: '#e6f4ea' },
+  { id: 'rascunho', label: 'Rascunho', cor: '#5f6368', fundo: '#f1f3f4' },
+  { id: 'ativo', label: 'Ativa', cor: '#b3261e', fundo: '#fce8e6' },
+  { id: 'monitoramento', label: 'Em monitoramento', cor: '#0b57d0', fundo: '#e8f0fe' },
+  { id: 'controlado', label: 'Controlada', cor: '#8a3b00', fundo: '#fff4e5' },
+  { id: 'encerrado', label: 'Encerrada', cor: '#137333', fundo: '#e6f4ea' },
 ];
 
 export function dadosStatus(status) {

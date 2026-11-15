@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { View, TouchableOpacity, ImageBackground, Alert, ActivityIndicator, KeyboardAvoidingView, ScrollView, Platform, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text, TextInput } from '../components/texto';
+import Icone from '../components/icone';
 import { useRouter } from 'expo-router';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { auth } from '../services/firebaseConfig';
@@ -162,7 +163,7 @@ export default function EmailLogin() {
                 secureTextEntry={!mostrarSenha}
               />
               <TouchableOpacity style={styles.eyeButton} onPress={() => setMostrarSenha(atual => !atual)}>
-                <Text style={styles.eyeText}>{mostrarSenha ? '🙈' : '👁️'}</Text>
+                <Icone nome={mostrarSenha ? 'olhoFechado' : 'olho'} size={20} color={cores.textMuted} />
               </TouchableOpacity>
             </View>
 

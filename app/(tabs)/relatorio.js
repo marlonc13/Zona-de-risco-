@@ -1,5 +1,6 @@
 import { ActivityIndicator, Alert, ScrollView, TouchableOpacity, View } from 'react-native';
 import { Text } from '../../components/texto';
+import Icone, { IconeStatus } from '../../components/icone';
 import { useEffect, useMemo, useState } from 'react';
 import { collection, getFirestore, onSnapshot } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -150,7 +151,7 @@ export default function RelatorioScreen() {
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Ciclo de vida dos alertas</Text>
-        {dados.estados.map(item => <View key={item.id} style={styles.rowItem}><Text style={[styles.rowName, { color: item.cor }]}>{item.emoji} {item.label}</Text><Text style={styles.rowTotal}>{item.total}</Text></View>)}
+        {dados.estados.map(item => <View key={item.id} style={styles.rowItem}><Text style={[styles.rowName, { color: item.cor }]}><IconeStatus id={item.id} /> {item.label}</Text><Text style={styles.rowTotal}>{item.total}</Text></View>)}
       </View>
 
       <View style={styles.section}>
@@ -159,7 +160,7 @@ export default function RelatorioScreen() {
       </View>
 
       <TouchableOpacity style={styles.pdfButton} onPress={exportarPdf} disabled={exportando}>
-        <Text style={styles.pdfButtonText}>{exportando ? 'Gerando PDF...' : '📄 Exportar relatório em PDF'}</Text>
+        <Text style={styles.pdfButtonText}>{exportando ? 'Gerando PDF...' : <><Icone nome="pdf" size={15} /> Exportar relatório em PDF</>}</Text>
       </TouchableOpacity>
     </ScrollView>
   );

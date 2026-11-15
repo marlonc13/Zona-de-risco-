@@ -1,6 +1,7 @@
 import { TouchableOpacity, Alert, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text, TextInput } from '../components/texto';
+import Icone from '../components/icone';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
 import * as Location from 'expo-location';
@@ -75,7 +76,7 @@ export default function Endereco() {
     <ScrollView contentContainerStyle={[styles.container, { paddingBottom: 26 + insets.bottom }]}>
       <Text style={styles.title}>Minha residência</Text>
       <Text style={styles.subtitle}>Cadastre ou altere o endereço da sua casa.</Text>
-      <TouchableOpacity style={styles.locationButton} onPress={usarLocalizacao}><Text style={styles.locationText}>📍 Usar minha localização atual</Text></TouchableOpacity>
+      <TouchableOpacity style={styles.locationButton} onPress={usarLocalizacao}><Text style={styles.locationText}><Icone nome="localizacao" size={15} /> Usar minha localização atual</Text></TouchableOpacity>
       <TextInput style={styles.input} placeholder="Rua / Avenida" placeholderTextColor={cores.placeholder} value={endereco} onChangeText={setEndereco} />
       <TextInput style={styles.input} placeholder="Número" placeholderTextColor={cores.placeholder} value={numero} onChangeText={setNumero} keyboardType="numeric" />
       <TextInput style={styles.input} placeholder="Bairro" placeholderTextColor={cores.placeholder} value={bairro} onChangeText={setBairro} />

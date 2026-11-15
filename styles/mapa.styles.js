@@ -79,7 +79,6 @@ export default criarEstilos((c, tema) => {
     mapWhatsAppButton: { backgroundColor: '#25D366', borderRadius: 11, paddingHorizontal: 12, paddingVertical: 10 },
     mapWhatsAppText: { color: '#fff', fontWeight: '900', fontSize: 12 },
     shareAlertClose: { width: 26, height: 26, borderRadius: 13, backgroundColor: c.surfaceMuted, alignItems: 'center', justifyContent: 'center' },
-    shareAlertCloseText: { color: c.textMuted, fontWeight: '900', fontSize: 11 },
     modalOverlay: { flex: 1, backgroundColor: c.overlay, justifyContent: 'flex-end' },
     modalBox: { backgroundColor: c.surface, padding: 18, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingBottom: 18, maxHeight: '90%', width: '100%' },
     dragIndicator: { width: 40, height: 5, backgroundColor: l.indicador, borderRadius: 3, alignSelf: 'center', marginBottom: 10 },

@@ -1,7 +1,7 @@
 import { View, FlatList, Image, ActivityIndicator, TouchableOpacity, Alert, Modal, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text, TextInput } from '../../components/texto';
-import ModalDeslizante from '../../components/modal-deslizante';
+import ModalDeslizante, { RolagemModal } from '../../components/modal-deslizante';
 import { useState, useEffect, useMemo } from 'react';
 import { getFirestore, collection, onSnapshot, doc, updateDoc, deleteDoc, serverTimestamp, arrayUnion } from 'firebase/firestore';
 import app, { auth } from '../../services/firebaseConfig';
@@ -13,6 +13,7 @@ import { observarStatusAdministrador } from '../../services/accessControl';
 import { GRAVIDADES, RAIOS_ALERTA, dadosGravidade, formatarRaio, orientacaoDoRisco } from '../../services/riskGuidance';
 import { STATUS_ALERTA, dadosStatus, statusEfetivo } from '../../services/alertLifecycle';
 import ScreenWrapper from '../../components/screen-wrapper';
+import { IconeGravidade, IconeStatus, IconeTipo } from '../../components/icone';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
 const db = getFirestore(app);
@@ -26,59 +27,6 @@ const PERIODOS = [
 ];
 
 const TIPOS = ['Todos', 'Alagamento', 'Enchente', 'Deslizamento', 'Vendaval',  'Incêndio florestal'];
-
-const ICONES_TIPO = {
-  alagamento: 'waves',
-  enchente: 'weather-pouring',
-  deslizamento: 'terrain',
-  vendaval: 'weather-windy',
-  seca: 'weather-sunny',
-  'incendio florestal': 'fire',
-};
-
-const ICONES_STATUS = {
-  Todos: 'clipboard-list-outline',
-  rascunho: 'file-document-edit-outline',
-  ativo: 'alert-circle',
-  monitoramento: 'eye',
-  controlado: 'shield-check',
-  encerrado: 'check-circle',
-};
-
-const ICONES_GRAVIDADE = {
-  'Atenção': 'alert-circle-outline',
-  'Alerta': 'alert',
-  'Emergência': 'alert-octagon',
-  'Grave': 'alert-octagon',
-};
-
-const normalizarTipo = (tipo) => {
-  return String(tipo || '')
-    .trim()
-    .toLocaleLowerCase('pt-BR')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '');
-};
-
-const IconeTipo = ({ tipo, size = 18, color = '#1a73e8' }) => {
-  const tipoNormalizado = normalizarTipo(tipo);
-
-  return (
-    <MaterialCommunityIcons
-      name={ICONES_TIPO[tipoNormalizado] || 'alert-circle-outline'}
-      size={size}
-      color={color}
-    />
-  );
-};
-
-const IconeStatus = ({ id, size = 14, color = '#1a73e8' }) => (
-  <MaterialCommunityIcons name={ICONES_STATUS[id] || 'circle-outline'} size={size} color={color} />
-);
-
-const IconeGravidade = ({ label, size = 14, color = '#1a73e8' }) => (
-  <MaterialCommunityIcons name={ICONES_GRAVIDADE[label] || 'alert-outline'} size={size} color={color} />
-);
 
 const obterTimestamp = (valor) => {
   if (typeof valor === 'number') return valor;
@@ -612,7 +560,7 @@ export default function ListaAlertasScreen() {
         estiloPainel={styles.modalBox}
         fecharAoTocarFora={false}
       >
-            <ScrollView showsVerticalScrollIndicator={false}>
+            <RolagemModal showsVerticalScrollIndicator={false}>
               <Text style={styles.modalTitle}>Editar ocorrência</Text>
               <Text style={styles.modalLabel}>Descrição atual</Text>
               <TextInput style={styles.modalInput} multiline placeholderTextColor={cores.placeholder} value={descricaoEdicao} onChangeText={setDescricaoEdicao} />
@@ -624,7 +572,7 @@ export default function ListaAlertasScreen() {
               <View style={styles.optionsRow}>
                 {GRAVIDADES.map(item => (
                   <TouchableOpacity key={item.label} onPress={() => setGravidadeEdicao(item.label)} style={[styles.option, gravidadeEdicao === item.label && { backgroundColor: item.cor }]}>
-                    <Text style={[styles.optionText, gravidadeEdicao === item.label && styles.optionTextActive]}>{item.emoji} {item.label}</Text>
+                    <Text style={[styles.optionText, gravidadeEdicao === item.label && styles.optionTextActive]}><IconeGravidade label={item.label} color={gravidadeEdicao === item.label ? undefined : item.cor} /> {item.label}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -640,7 +588,7 @@ export default function ListaAlertasScreen() {
 
               <Text style={styles.modalLabel}>Estado da ocorrência</Text>
               <View style={styles.optionsRow}>
-                {STATUS_ALERTA.map(item => <TouchableOpacity key={item.id} onPress={() => setStatusEdicao(item.id)} style={[styles.option, statusEdicao === item.id && { backgroundColor: item.cor }]}><Text style={[styles.optionText, statusEdicao === item.id && styles.optionTextActive]}>{item.emoji} {item.label}</Text></TouchableOpacity>)}
+                {STATUS_ALERTA.map(item => <TouchableOpacity key={item.id} onPress={() => setStatusEdicao(item.id)} style={[styles.option, statusEdicao === item.id && { backgroundColor: item.cor }]}><Text style={[styles.optionText, statusEdicao === item.id && styles.optionTextActive]}><IconeStatus id={item.id} color={statusEdicao === item.id ? undefined : item.cor} /> {item.label}</Text></TouchableOpacity>)}
               </View>
 
               <Text style={styles.reactivateNote}>Somente ocorrências ativas ou em monitoramento aparecem no mapa. Toda mudança fica registrada no histórico administrativo.</Text>
@@ -648,7 +596,7 @@ export default function ListaAlertasScreen() {
                 <TouchableOpacity style={styles.modalCancel} onPress={() => setEditando(null)}><Text style={styles.modalCancelText}>Cancelar</Text></TouchableOpacity>
                 <TouchableOpacity style={styles.modalSave} onPress={salvarEdicao} disabled={salvandoEdicao}><Text style={styles.modalSaveText}>{salvandoEdicao ? 'Salvando...' : 'Salvar'}</Text></TouchableOpacity>
               </View>
-            </ScrollView>
+            </RolagemModal>
       </ModalDeslizante>
     </ScreenWrapper>
   );
