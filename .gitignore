@@ -45,3 +45,8 @@ app-example
 *.apk
 
 dist-*-check/
+
+# logs do emulador do Firebase (npm run test:regras)
+firebase-debug.log
+firestore-debug.log
+ui-debug.log

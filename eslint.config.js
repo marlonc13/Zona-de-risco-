@@ -13,4 +13,9 @@ module.exports = defineConfig([
     files: ['__tests__/**/*.js'],
     languageOptions: { globals: globals.jest },
   },
+  {
+    // testes das regras do Firestore rodam em Node, fora do app
+    files: ['__tests__/regras/**/*.js'],
+    languageOptions: { globals: { ...globals.jest, ...globals.node } },
+  },
 ]);

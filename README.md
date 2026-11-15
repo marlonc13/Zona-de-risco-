@@ -233,6 +233,7 @@ O aplicativo atualiza a localização a cada ~60 segundos ou após deslocamento 
 
 ```bash
 npm test
+npm run test:regras   # regras do Firestore, no emulador (precisa de Java 17 ou mais recente)
 npm run lint
 npx expo-doctor
 ```
@@ -241,7 +242,9 @@ npx expo-doctor
 
 Os testes ficam em `__tests__/` e cobrem as regras principais do app: ciclo de vida das ocorrências (o que aparece no mapa), controle de administradores, avisos de alertas próximos, orientações de risco e a opção "Letras grandes". Eles não usam o Firebase real nem precisam de celular.
 
-No GitHub, o workflow **Testes** (`.github/workflows/testes.yml`) roda `npm test` em todo push e em todo pull request para a `main`. A `main` é protegida: as alterações entram por pull request e o merge só é liberado quando os testes passam.
+As **regras do Firestore** (`firestore.rules`) têm testes próprios em `__tests__/regras/`, executados no emulador do Firebase: eles conferem que visitantes e usuários comuns não publicam alertas nem gerenciam abrigos, que cada pessoa só acessa o próprio perfil, que administradores desativados perdem o acesso e que só a administradora principal cadastra administradores. Na primeira execução o emulador é baixado automaticamente.
+
+No GitHub, o workflow **Testes** (`.github/workflows/testes.yml`) roda `npm test` e `npm run test:regras` em todo push e em todo pull request para a `main`. A `main` é protegida: as alterações entram por pull request e o merge só é liberado quando os testes passam.
 
 ## Estrutura do projeto
 
