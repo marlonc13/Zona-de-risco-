@@ -1,9 +1,9 @@
-import { StyleSheet } from 'react-native';
+import { criarEstilos } from '../hooks/use-tema';
 
-const styles = StyleSheet.create({
+export default criarEstilos((c) => ({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff', // Fundo branco enquanto carrega
+    backgroundColor: c.surface, // Fundo da tela enquanto carrega
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -11,6 +11,4 @@ const styles = StyleSheet.create({
     width: 140,
     height: 140,
   },
-});
-
-export default styles;
+}));

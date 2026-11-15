@@ -3,14 +3,16 @@ import { useEffect, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Entypo, FontAwesome5, Octicons } from '@expo/vector-icons';
 
-import { Colors } from '../../constants/theme';
-import { useColorScheme } from '../../hooks/use-color-scheme';
+import { useTema } from '../../hooks/use-tema';
+import { useFonte } from '../../contexts/FonteContext';
+import { Text } from '../../components/texto';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../../services/firebaseConfig';
 import { observarStatusAdministrador } from '../../services/accessControl';
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme() ?? 'light';
+  const { cores } = useTema();
+  const { letraGrande } = useFonte();
   const [administrador, setAdministrador] = useState(false);
   const insets = useSafeAreaInsets();
 
@@ -26,17 +28,26 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme].tint,
+        tabBarActiveTintColor: cores.tint,
+        tabBarInactiveTintColor: cores.textMuted,
         headerShown: false,
         tabBarStyle: {
-          height: 60 + insets.bottom,          
+          height: (letraGrande ? 66 : 60) + insets.bottom,
           paddingBottom: insets.bottom,       
-          backgroundColor: '#fff',
+          backgroundColor: cores.tabBar,
+          borderTopColor: cores.border,
         },
-        tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: '600',
-        }
+        // Rótulo em uma linha só: com "Letras grandes" ele encolhe se não couber na aba
+        tabBarLabel: ({ color, children }) => (
+          <Text
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.7}
+            style={{ color, fontSize: 12, fontWeight: '600', textAlign: 'center' }}
+          >
+            {children}
+          </Text>
+        ),
       }}
     >
       {/* 1ª Aba: Mapa */}
@@ -45,7 +56,7 @@ export default function TabLayout() {
         options={{
           title: 'Mapa',
           tabBarIcon: ({ color }) => (
-            <Entypo name="map" size={24} color="black" />
+            <Entypo name="map" size={24} color={cores.icon} />
           ),
         }}
       />
@@ -55,7 +66,7 @@ export default function TabLayout() {
         options={{
           title: 'Abrigos',
           tabBarIcon: () => (
-            <FontAwesome5 name="house-user" size={24} color="black" />
+            <FontAwesome5 name="house-user" size={24} color={cores.icon} />
           ),
         }}
       />
@@ -65,7 +76,7 @@ export default function TabLayout() {
         options={{
           title: 'Estatísticas',
           tabBarIcon: () => (
-            <Octicons name="graph" size={24} color="black" />
+            <Octicons name="graph" size={24} color={cores.icon} />
           ),
         }}
       />
@@ -76,7 +87,7 @@ export default function TabLayout() {
         options={{
           title: 'Alertas',
           tabBarIcon: ({ color }) => (
-            <Entypo name="warning" size={24} color="black" />
+            <Entypo name="warning" size={24} color={cores.icon} />
           ),
         }}
       />
@@ -87,7 +98,7 @@ export default function TabLayout() {
           title: 'Relatório',
           href: administrador ? undefined : null,
           tabBarIcon: () => (
-            <Entypo name="bar-graph" size={24} color="black" />
+            <Entypo name="bar-graph" size={24} color={cores.icon} />
           ),
         }}
       />

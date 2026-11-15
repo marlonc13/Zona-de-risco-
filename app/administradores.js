@@ -1,15 +1,21 @@
-import { Alert, FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, FlatList, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Text, TextInput } from '../components/texto';
 import { useEffect, useState } from 'react';
 import { collection, deleteDoc, doc, getFirestore, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import { useRouter } from 'expo-router';
 import app, { auth } from '../services/firebaseConfig';
 import { ADMIN_PRINCIPAL, isMainAdmin, normalizarEmail } from '../services/accessControl';
+import { criarEstilos, useEstilos, useTema } from '../hooks/use-tema';
 
 const db = getFirestore(app);
 
 export default function AdministradoresScreen() {
   const router = useRouter();
+  const styles = useEstilos(estilos);
+  const insets = useSafeAreaInsets();
+  const { cores } = useTema();
   const [email, setEmail] = useState('');
   const [nome, setNome] = useState('');
   const [administradores, setAdministradores] = useState([]);
@@ -63,53 +69,55 @@ export default function AdministradoresScreen() {
     { text: 'Remover', style: 'destructive', onPress: () => deleteDoc(doc(db, 'administradores', item.email)) },
   ]);
 
-  if (!autorizada) return <View style={styles.loading}><Text>Verificando acesso...</Text></View>;
+  if (!autorizada) return <View style={styles.loading}><Text style={styles.loadingText}>Verificando acesso...</Text></View>;
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.back} onPress={() => router.back()}><Text style={styles.backText}>‹</Text></TouchableOpacity>
-        <View><Text style={styles.title}>Administradores</Text><Text style={styles.subtitle}>Controle de acesso ao painel</Text></View>
+      <View style={[styles.header, { paddingTop: Math.max(50, insets.top + 12) }]}>
+        <TouchableOpacity style={styles.back} onPress={() => router.back()}><Text escalavel={false} style={styles.backText}>‹</Text></TouchableOpacity>
+        <View style={{ flex: 1 }}><Text style={styles.title}>Administradores</Text><Text style={styles.subtitle}>Controle de acesso ao painel</Text></View>
       </View>
 
       <View style={styles.form}>
         <Text style={styles.formTitle}>Cadastrar novo administrador</Text>
-        <TextInput style={styles.input} placeholder="Nome" value={nome} onChangeText={setNome} />
-        <TextInput style={styles.input} placeholder="E-mail da conta" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" />
+        <TextInput style={styles.input} placeholder="Nome" placeholderTextColor={cores.placeholder} value={nome} onChangeText={setNome} />
+        <TextInput style={styles.input} placeholder="E-mail da conta" placeholderTextColor={cores.placeholder} value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" />
         <TouchableOpacity style={styles.button} onPress={cadastrar} disabled={salvando}><Text style={styles.buttonText}>{salvando ? 'Cadastrando...' : 'Adicionar administrador'}</Text></TouchableOpacity>
         <Text style={styles.note}>O administrador deverá entrar ou criar uma conta com o mesmo e-mail. Nenhuma senha é compartilhada.</Text>
       </View>
 
       <Text style={styles.listTitle}>Administradores autorizados</Text>
-      <View style={styles.mainCard}><View><Text style={styles.adminName}>Administrador principal</Text><Text style={styles.adminEmail}>{ADMIN_PRINCIPAL}</Text></View><Text style={styles.mainBadge}>PRINCIPAL</Text></View>
-      <FlatList data={administradores} keyExtractor={item => item.email} contentContainerStyle={styles.list} ListEmptyComponent={<Text style={styles.empty}>Nenhum outro administrador cadastrado.</Text>} renderItem={({ item }) => <View style={styles.adminCard}><View style={{ flex: 1 }}><Text style={styles.adminName}>{item.nome || 'Administrador'}</Text><Text style={styles.adminEmail}>{item.email}</Text><Text style={styles.adminMeta}>Cadastrado por {item.cadastradoPor || ADMIN_PRINCIPAL}</Text></View><TouchableOpacity style={styles.remove} onPress={() => remover(item)}><Text style={styles.removeText}>Remover</Text></TouchableOpacity></View>} />
+      <View style={styles.mainCard}><View style={{ flex: 1, marginRight: 10 }}><Text style={styles.adminName}>Administrador principal</Text><Text style={styles.adminEmail}>{ADMIN_PRINCIPAL}</Text></View><Text style={styles.mainBadge}>PRINCIPAL</Text></View>
+      <FlatList data={administradores} keyExtractor={item => item.email} contentContainerStyle={[styles.list, { paddingBottom: 40 + insets.bottom }]} ListEmptyComponent={<Text style={styles.empty}>Nenhum outro administrador cadastrado.</Text>} renderItem={({ item }) => <View style={styles.adminCard}><View style={{ flex: 1 }}><Text style={styles.adminName}>{item.nome || 'Administrador'}</Text><Text style={styles.adminEmail}>{item.email}</Text><Text style={styles.adminMeta}>Cadastrado por {item.cadastradoPor || ADMIN_PRINCIPAL}</Text></View><TouchableOpacity style={styles.remove} onPress={() => remover(item)}><Text style={styles.removeText}>Remover</Text></TouchableOpacity></View>} />
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f7fb' },
-  loading: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f5f7fb' },
-  header: { paddingTop: 50, paddingHorizontal: 16, paddingBottom: 14, backgroundColor: '#fff', flexDirection: 'row', alignItems: 'center', gap: 12 },
-  back: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#f1f3f4', alignItems: 'center', justifyContent: 'center' },
-  backText: { fontSize: 30, lineHeight: 32, color: '#202124' },
-  title: { color: '#202124', fontSize: 22, fontWeight: '900' },
-  subtitle: { color: '#5f6368', fontSize: 12 },
-  form: { backgroundColor: '#fff', margin: 14, padding: 15, borderRadius: 16, borderWidth: 1, borderColor: '#e1e5ea' },
-  formTitle: { color: '#202124', fontSize: 16, fontWeight: '900', marginBottom: 10 },
-  input: { borderWidth: 1, borderColor: '#dadce0', borderRadius: 11, padding: 11, color: '#202124', marginBottom: 8 },
-  button: { backgroundColor: '#1a73e8', padding: 12, borderRadius: 11, alignItems: 'center' },
-  buttonText: { color: '#fff', fontWeight: '900' },
-  note: { color: '#5f6368', fontSize: 11, lineHeight: 16, marginTop: 9 },
-  listTitle: { color: '#202124', fontSize: 16, fontWeight: '900', marginHorizontal: 16, marginBottom: 7 },
-  mainCard: { backgroundColor: '#e8f0fe', marginHorizontal: 14, padding: 14, borderRadius: 14, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  mainBadge: { color: '#1a73e8', fontSize: 10, fontWeight: '900' },
+const estilos = criarEstilos((c, tema) => ({
+  container: { flex: 1, backgroundColor: c.screen },
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: c.screen },
+  // no claro mantém a cor padrão do sistema
+  loadingText: tema === 'dark' ? { color: c.textStrong } : {},
+  header: { paddingTop: 50, paddingHorizontal: 16, paddingBottom: 14, backgroundColor: c.surface, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  back: { width: 38, height: 38, borderRadius: 19, backgroundColor: c.surfaceMuted, alignItems: 'center', justifyContent: 'center' },
+  backText: { fontSize: 30, lineHeight: 32, color: c.textStrong },
+  title: { color: c.textStrong, fontSize: 22, fontWeight: '900' },
+  subtitle: { color: c.textMuted, fontSize: 12 },
+  form: { backgroundColor: c.surface, margin: 14, padding: 15, borderRadius: 16, borderWidth: 1, borderColor: c.borderSoft },
+  formTitle: { color: c.textStrong, fontSize: 16, fontWeight: '900', marginBottom: 10 },
+  input: { borderWidth: 1, borderColor: c.border, borderRadius: 11, padding: 11, color: c.textStrong, marginBottom: 8 },
+  button: { backgroundColor: c.button, padding: 12, borderRadius: 11, alignItems: 'center' },
+  buttonText: { color: c.onButton, fontWeight: '900' },
+  note: { color: c.textMuted, fontSize: 11, lineHeight: 16, marginTop: 9 },
+  listTitle: { color: c.textStrong, fontSize: 16, fontWeight: '900', marginHorizontal: 16, marginBottom: 7 },
+  mainCard: { backgroundColor: c.tintBackground, marginHorizontal: 14, padding: 14, borderRadius: 14, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  mainBadge: { color: c.tint, fontSize: 10, fontWeight: '900' },
   list: { padding: 14, paddingBottom: 40, gap: 8 },
-  adminCard: { backgroundColor: '#fff', padding: 14, borderRadius: 14, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#e1e5ea' },
-  adminName: { color: '#202124', fontWeight: '900' },
-  adminEmail: { color: '#5f6368', fontSize: 12, marginTop: 2 },
-  adminMeta: { color: '#80868b', fontSize: 10, marginTop: 4 },
-  remove: { backgroundColor: '#fce8e6', paddingHorizontal: 10, paddingVertical: 8, borderRadius: 9 },
-  removeText: { color: '#c5221f', fontWeight: '900', fontSize: 12 },
-  empty: { color: '#80868b', textAlign: 'center', marginTop: 20 },
-});
+  adminCard: { backgroundColor: c.surface, padding: 14, borderRadius: 14, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: c.borderSoft },
+  adminName: { color: c.textStrong, fontWeight: '900' },
+  adminEmail: { color: c.textMuted, fontSize: 12, marginTop: 2 },
+  adminMeta: { color: c.textFaint, fontSize: 10, marginTop: 4 },
+  remove: { backgroundColor: c.dangerBackground, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 9 },
+  removeText: { color: c.dangerStrong, fontWeight: '900', fontSize: 12 },
+  empty: { color: c.textFaint, textAlign: 'center', marginTop: 20 },
+}));

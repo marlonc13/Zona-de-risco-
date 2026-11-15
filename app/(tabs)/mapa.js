@@ -1,5 +1,7 @@
-import { View, Text, TouchableOpacity, Alert, ScrollView, Modal, TextInput, Image, Linking, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, TouchableOpacity, Alert, ScrollView, Image, Linking, ActivityIndicator } from 'react-native';
+import { Text, TextInput } from '../../components/texto';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
@@ -16,21 +18,35 @@ import { RAIOS_ALERTA, dadosGravidade, formatarRaio, orientacaoDoRisco } from '.
 import { buscarClimaAtual } from '../../services/weatherService';
 import { uploadImage } from '../../services/imageUpload';
 import CameraCaptura from '../../components/camera-captura';
+import ModalDeslizante from '../../components/modal-deslizante';
 import { apareceNoMapa, statusEfetivo } from '../../services/alertLifecycle';
 import { compartilharAlertaWhatsApp } from '../../services/shareAlert';
 
 import app from '../../services/firebaseConfig';
-import styles from '../../styles/mapa.styles';
+import { useTema, useEstilos } from '../../hooks/use-tema';
+import estilosMapa from '../../styles/mapa.styles';
 
 Mapbox.setAccessToken(process.env.EXPO_PUBLIC_MAPBOX_TOKEN);
 
 const db = getFirestore(app);
 const auth = getAuth(app);
 
-const REGIAO_PADRAO = {
-  latitude: 0,
-  longitude: 0,
+// Estilo do mapa conforme o tema escolhido em Configurações
+const ESTILO_MAPA = {
+  light: 'mapbox://styles/mapbox/streets-v12',
+  dark: 'mapbox://styles/mapbox/navigation-night-v1',
 };
+
+// Sem nenhuma localização conhecida, o mapa abre mostrando o Brasil (e não o meio do oceano)
+const REGIAO_PADRAO = {
+  latitude: -14.235,
+  longitude: -51.9253,
+};
+const ZOOM_PADRAO = 3.5;
+const ZOOM_USUARIO = 14;
+
+// Última posição do usuário, para o mapa já abrir no lugar certo na próxima vez
+const CHAVE_ULTIMA_LOCALIZACAO = 'ultimaLocalizacaoMapa';
 
 const TIPOS_ALERTA = [
   { label: 'Todos', emoji: '🗺️', renderIcon: (color) => <Entypo name="map" size={18} color={color} />, cor: '#1a73e8' },
@@ -46,6 +62,9 @@ const emojiDoTipo = (tipo) => {
   const encontrado = TIPOS_ALERTA.find(t => t.label.toLowerCase().includes(tipo.toLowerCase()) || tipo.toLowerCase().includes(t.label.toLowerCase()));
   return encontrado?.emoji || '⚠️';
 };
+
+// Distância entre a barra "Zona de Risco" e os filtros de tipo
+const ESPACO_FILTROS = 22;
 
 const OPCOES_TEMPO = [
   { label: '30 Minutos', valor: 30 * 60 * 1000 },
@@ -106,6 +125,9 @@ export default function MapScreen() {
   const cameraRef = useRef(null);
   const emergenciasExibidas = useRef(new Set());
   const insets = useSafeAreaInsets();
+  const { tema, cores } = useTema();
+  const styles = useEstilos(estilosMapa);
+  const estiloMapa = ESTILO_MAPA[tema];
 
   const [usuario, setUsuario] = useState(null);
   const [localizacao, setLocalizacao] = useState(null);
@@ -134,6 +156,13 @@ export default function MapScreen() {
   const [administrador, setAdministrador] = useState(false);
   const [alertaSelecionado, setAlertaSelecionado] = useState(null);
   const [modalContatosVisivel, setModalContatosVisivel] = useState(false);
+  // Fim da barra "Zona de Risco": os filtros ficam logo abaixo dela, mesmo com "Letras grandes"
+  const [fimBarraSuperior, setFimBarraSuperior] = useState(null);
+  const [centroInicial, setCentroInicial] = useState(null);
+  const jaCentralizou = useRef(false);
+  const usuarioMexeuNoMapa = useRef(false);
+
+  const fecharContatos = () => setModalContatosVisivel(false);
 
   useEffect(() => {
     let pararAdmin = () => {};
@@ -169,42 +198,77 @@ export default function MapScreen() {
     return unsubscribeEndereco;
   }, [usuario]);
 
+  // 1) Onde o mapa abre: última posição salva > última posição do aparelho > Brasil.
+  //    Tudo isso é instantâneo; o mapa só é montado depois, já no lugar certo.
   useEffect(() => {
-    const pegarLocalizacao = async () => {
+    let ativo = true;
+    const carregarCentroInicial = async () => {
+      let coords = null;
+      try {
+        const salvo = await AsyncStorage.getItem(CHAVE_ULTIMA_LOCALIZACAO);
+        if (salvo) coords = JSON.parse(salvo);
+      } catch {}
+      if (!coords) {
+        try {
+          const { granted } = await Location.getForegroundPermissionsAsync();
+          const ultima = granted ? await Location.getLastKnownPositionAsync() : null;
+          if (ultima) coords = { latitude: ultima.coords.latitude, longitude: ultima.coords.longitude };
+        } catch {}
+      }
+      if (!ativo) return;
+      setCentroInicial(coords
+        ? { ...coords, zoom: ZOOM_USUARIO, conhecido: true }
+        : { ...REGIAO_PADRAO, zoom: ZOOM_PADRAO, conhecido: false });
+    };
+    carregarCentroInicial();
+    return () => { ativo = false; };
+  }, []);
+
+  // 2) Acompanha a posição real do usuário (a primeira leitura chega logo e é refinada depois)
+  useEffect(() => {
+    let ativo = true;
+    let inscricao;
+    const atualizar = coords => {
+      const nova = { latitude: coords.latitude, longitude: coords.longitude };
+      setLocalizacao(nova);
+      AsyncStorage.setItem(CHAVE_ULTIMA_LOCALIZACAO, JSON.stringify(nova)).catch(() => {});
+    };
+    const acompanhar = async () => {
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') return;
-
-        const posicao = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-        const novaLocalizacao = { latitude: posicao.coords.latitude, longitude: posicao.coords.longitude };
-
-        setLocalizacao({ latitude: posicao.coords.latitude, longitude: posicao.coords.longitude });
-
-        cameraRef.current?.setCamera({
-          centerCoordinate: [novaLocalizacao.longitude, novaLocalizacao.latitude],
-          zoomLevel: 14,
-          animationDuration: 1000,
-        });
+        if (status !== 'granted' || !ativo) return;
+        const ultima = await Location.getLastKnownPositionAsync().catch(() => null);
+        if (ultima && ativo) atualizar(ultima.coords);
+        const sub = await Location.watchPositionAsync(
+          { accuracy: Location.Accuracy.Balanced, timeInterval: 60000, distanceInterval: 50 },
+          posicao => atualizar(posicao.coords)
+        );
+        if (ativo) inscricao = sub; else sub.remove();
       } catch (erro) {
-        console.error(erro);
+        console.error('Erro ao obter localização:', erro);
       }
     };
-    pegarLocalizacao();
+    acompanhar();
+    return () => { ativo = false; inscricao?.remove(); };
   }, []);
 
+  // 3) Centraliza no usuário uma única vez, só se precisar e se ele ainda não mexeu no mapa
   useEffect(() => {
-    let inscricao;
-    const acompanhar = async () => {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') return;
-      inscricao = await Location.watchPositionAsync(
-        { accuracy: Location.Accuracy.Balanced, timeInterval: 60000, distanceInterval: 50 },
-        posicao => setLocalizacao({ latitude: posicao.coords.latitude, longitude: posicao.coords.longitude })
-      );
-    };
-    acompanhar();
-    return () => inscricao?.remove();
-  }, []);
+    if (!localizacao || !centroInicial || jaCentralizou.current) return;
+    jaCentralizou.current = true;
+    if (usuarioMexeuNoMapa.current) return;
+
+    const distancia = distanciaKm(centroInicial, localizacao);
+    if (centroInicial.conhecido && distancia < 0.3) return; // já abriu no lugar certo
+
+    const longe = !centroInicial.conhecido || distancia > 30;
+    cameraRef.current?.setCamera({
+      centerCoordinate: [localizacao.longitude, localizacao.latitude],
+      zoomLevel: ZOOM_USUARIO,
+      animationMode: longe ? 'flyTo' : 'easeTo',
+      animationDuration: longe ? 1600 : 700,
+    });
+  }, [localizacao, centroInicial]);
 
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, 'marcacoes'), snapshot => {
@@ -449,6 +513,11 @@ export default function MapScreen() {
 
   return (
     <View style={styles.container}>
+      {!centroInicial ? (
+        <View style={[styles.map, { alignItems: 'center', justifyContent: 'center' }]}>
+          <ActivityIndicator size="large" color={cores.tint} />
+        </View>
+      ) : (
       <Mapbox.MapView
         style={styles.map}
         scaleBarEnabled={false}
@@ -457,18 +526,20 @@ export default function MapScreen() {
         onLongPress={abrirModalMarcacao}
         logoEnabled={false}
         attributionEnabled={false}
-        styleURL="mapbox://styles/mapbox/streets-v12"
+        styleURL={estiloMapa}
         onCameraChanged={e => {
-          if (e.geometry?.coordinates) {
-            setRegiaoAtual({ latitude: e.geometry.coordinates[1], longitude: e.geometry.coordinates[0] });
-          }
+          if (e.gestures?.isGestureActive) usuarioMexeuNoMapa.current = true;
+        }}
+        onMapIdle={e => {
+          const centro = e.properties?.center;
+          if (centro) setRegiaoAtual({ latitude: centro[1], longitude: centro[0] });
         }}
       >
         <Mapbox.Camera
           ref={cameraRef}
           defaultSettings={{
-            centerCoordinate: [REGIAO_PADRAO.longitude, REGIAO_PADRAO.latitude],
-            zoomLevel: 13,
+            centerCoordinate: [centroInicial.longitude, centroInicial.latitude],
+            zoomLevel: centroInicial.zoom,
           }}
         />
 
@@ -547,18 +618,18 @@ export default function MapScreen() {
               coordinate={[ponto.longitude, ponto.latitude]}
             >
               <View style={{ width: 24, height: 24, backgroundColor: ponto.situacao === 'Aberto' ? '#188038' : '#9aa0a6', borderRadius: 12, borderWidth: 2, borderColor: '#fff', alignItems: 'center', justifyContent: 'center' }}>
-                <Text style={{ color: '#fff', fontSize: 13, fontWeight: '900' }}>S</Text>
+                <Text escalavel={false} style={{ color: '#fff', fontSize: 13, fontWeight: '900' }}>S</Text>
               </View>
               <Mapbox.Callout>
                 <View style={{ padding: 8, width: 220 }}>
-                  <Text style={{ fontSize: 15, fontWeight: '800', color: '#202124' }}>{ponto.nome || 'Ponto seguro'}</Text>
-                  <Text style={{ fontSize: 12, color: '#5f6368', marginVertical: 4 }}>{ponto.categoria || 'Ponto de encontro'} · {ponto.situacao || 'Situação não informada'}</Text>
-                  <Text style={{ fontSize: 12, color: '#3c4043' }}>{ponto.endereco || 'Endereço não informado'}</Text>
+                  <Text style={{ fontSize: 15, fontWeight: '800', color: cores.textStrong }}>{ponto.nome || 'Ponto seguro'}</Text>
+                  <Text style={{ fontSize: 12, color: cores.textMuted, marginVertical: 4 }}>{ponto.categoria || 'Ponto de encontro'} · {ponto.situacao || 'Situação não informada'}</Text>
+                  <Text style={{ fontSize: 12, color: cores.textSecondary }}>{ponto.endereco || 'Endereço não informado'}</Text>
                   <TouchableOpacity
                     onPress={() => abrirRotaPontoSeguro(ponto)}
-                    style={{ backgroundColor: '#188038', padding: 9, borderRadius: 7, marginTop: 8 }}
+                    style={{ backgroundColor: cores.successButton, padding: 9, borderRadius: 7, marginTop: 8 }}
                   >
-                    <Text style={{ color: '#fff', fontWeight: '800', textAlign: 'center' }}>Traçar rota até aqui</Text>
+                    <Text style={{ color: cores.onButton, fontWeight: '800', textAlign: 'center' }}>Traçar rota até aqui</Text>
                   </TouchableOpacity>
                 </View>
               </Mapbox.Callout>
@@ -571,23 +642,27 @@ export default function MapScreen() {
           </Mapbox.PointAnnotation>
         )}
       </Mapbox.MapView>
+      )}
 
-      <View style={[styles.searchBox, { marginTop: insets.top - 35 }]}>
+      <View
+        style={[styles.searchBox, { marginTop: insets.top - 35 }]}
+        onLayout={e => {
+          const { y, height } = e.nativeEvent.layout;
+          setFimBarraSuperior(y + height);
+        }}
+      >
         <TouchableOpacity style={styles.avatar} onPress={abrirPerfil}><Text style={styles.avatarText}>{iniciais}</Text></TouchableOpacity>
         <View style={{ flex: 1 }}><Text style={styles.searchTitle}>Zona de Risco</Text><Text style={styles.searchSub}>{administrador ? 'Modo administrador' : 'Alertas naturais próximos'}</Text></View>
         <TouchableOpacity style={styles.sosHeaderButton} onPress={() => setModalContatosVisivel(true)}><Text style={styles.sosHeaderText}>SOS</Text></TouchableOpacity>
         <TouchableOpacity style={[styles.heatmapHeaderButton, mapaCalorAtivo && styles.heatmapHeaderButtonActive]} onPress={() => setMapaCalorAtivo(atual => !atual)}>
-          <MaterialCommunityIcons name="fire" size={24} color="black" />
+          <MaterialCommunityIcons name="fire" size={24} color={cores.icon} />
           </TouchableOpacity>
-        <TouchableOpacity onPress={() => router.push('/config')}>
-          <Entypo name="tools" size={24} color="black" />
-        </TouchableOpacity>
       </View>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={[styles.filterBar, { marginTop: insets.top - 35 }]}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={[styles.filterBar, fimBarraSuperior !== null ? { top: fimBarraSuperior + ESPACO_FILTROS } : { marginTop: insets.top - 35 }]}>
         {TIPOS_ALERTA.map(tipo => (
           <TouchableOpacity key={tipo.label} onPress={() => setFiltroAtivo(tipo.label)} style={[styles.chip, { flexDirection: 'row', alignItems: 'center', gap: 2 }, filtroAtivo === tipo.label && { backgroundColor: tipo.cor }]}>
-            {tipo.renderIcon(filtroAtivo === tipo.label ? '#fff' : '#5f6368')}
+            {tipo.renderIcon(filtroAtivo === tipo.label ? '#fff' : cores.textMuted)}
             <Text style={[styles.chipText, filtroAtivo === tipo.label && { color: '#fff' }]}>{tipo.label}</Text>
           </TouchableOpacity>
         ))}
@@ -604,28 +679,35 @@ export default function MapScreen() {
         </View>
       )}
 
-      <TouchableOpacity style={[styles.locationButton, { bottom: insets.bottom - 25 }]} onPress={() => {
+      <TouchableOpacity style={styles.locationButton} onPress={() => {
         if(localizacao) {
           cameraRef.current?.setCamera({ centerCoordinate: [localizacao.longitude, localizacao.latitude], zoomLevel: 14, animationDuration: 700 });
         }
       }}>
-        <FontAwesome name="map-pin" size={24} color="black" />
+        <FontAwesome name="map-pin" size={24} color={cores.icon} />
       </TouchableOpacity>
 
       {administrador && (
-        <TouchableOpacity style={[styles.addButton, { bottom: insets.bottom + 50 }]} onPress={pressionouBotaoAzul}>
-          <FontAwesome6 name="plus" size={24} color="black" />
+        <TouchableOpacity style={styles.addButton} onPress={pressionouBotaoAzul}>
+          <FontAwesome6 name="plus" size={24} color={cores.icon} />
         </TouchableOpacity>
       )}
 
       {/* Modal de Nova Ocorrência */}
-      <Modal visible={modalVisivel} transparent animationType="slide" onRequestClose={() => setModalVisivel(false)}>
-        <KeyboardAvoidingView
-          style={{ flex: 1 }}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        >
-          <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setModalVisivel(false)}>
-            <TouchableOpacity activeOpacity={1} style={styles.modalBox}>
+      <ModalDeslizante
+        visivel={modalVisivel}
+        onFechar={() => setModalVisivel(false)}
+        estiloFundo={styles.modalOverlay}
+        estiloPainel={styles.modalBox}
+        evitarTeclado
+        sobreposto={(
+          <CameraCaptura
+            visivel={cameraVisivel}
+            onFechar={() => setCameraVisivel(false)}
+            onFotoTirada={setFoto}
+          />
+        )}
+      >
               <ScrollView
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
@@ -634,14 +716,14 @@ export default function MapScreen() {
               <View style={styles.dragIndicator} />
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                 <Text style={styles.modalTitle}>Nova ocorrência</Text>
-                <TouchableOpacity onPress={() => setModalVisivel(false)} style={styles.closeButtonMini}><Text style={{ fontSize: 16, fontWeight: 'bold' }}>✕</Text></TouchableOpacity>
+                <TouchableOpacity onPress={() => setModalVisivel(false)} style={styles.closeButtonMini}><Text escalavel={false} style={{ fontSize: 16, fontWeight: 'bold', color: cores.text }}>✕</Text></TouchableOpacity>
               </View>
 
               <Text style={styles.sectionLabel}>Selecione o tipo:</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
                 {TIPOS_ALERTA.filter(t => t.label !== 'Todos').map(tipo => (
                   <TouchableOpacity key={tipo.label} onPress={() => setTipoSelecionado(tipo.label)} style={[styles.tipoChip, { flexDirection: 'row', alignItems: 'center' }, tipoSelecionado === tipo.label && { backgroundColor: tipo.cor }]}>
-                    {tipo.renderIcon(tipoSelecionado === tipo.label ? '#fff' : '#5f6368')}
+                    {tipo.renderIcon(tipoSelecionado === tipo.label ? '#fff' : cores.textMuted)}
                     <Text style={[styles.tipoText, tipoSelecionado === tipo.label && { color: '#fff' }]}>{tipo.label}</Text>
                   </TouchableOpacity>
                 ))}
@@ -656,8 +738,8 @@ export default function MapScreen() {
                 ))}
               </View>
 
-              <TextInput style={styles.input} placeholder="Descreva a situação atual..." value={comentario} onChangeText={setComentario} multiline />
-              <TextInput style={styles.neighborhoodInput} placeholder="Bairro" value={bairro} onChangeText={setBairro} />
+              <TextInput style={styles.input} placeholder="Descreva a situação atual..." placeholderTextColor={cores.placeholder} value={comentario} onChangeText={setComentario} multiline />
+              <TextInput style={styles.neighborhoodInput} placeholder="Bairro" placeholderTextColor={cores.placeholder} value={bairro} onChangeText={setBairro} />
               {foto && <Image source={{ uri: foto }} style={styles.preview} />}
 
               <View style={styles.photoRow}>
@@ -670,145 +752,135 @@ export default function MapScreen() {
                 <TouchableOpacity style={[styles.modalButton, styles.saveButton]} onPress={() => salvarMarcacao('ativo')} disabled={salvando}><Text style={styles.saveText}>{salvando ? 'Salvando...' : 'Publicar'}</Text></TouchableOpacity>
               </View>
               </ScrollView>
-            </TouchableOpacity>
-          </TouchableOpacity>
-        </KeyboardAvoidingView>
-
-        <CameraCaptura
-          visivel={cameraVisivel}
-          onFechar={() => setCameraVisivel(false)}
-          onFotoTirada={setFoto}
-        />
-      </Modal>
+      </ModalDeslizante>
 
       {/* Modal de Contatos de Emergência (SOS) */}
-      <Modal visible={modalContatosVisivel} transparent animationType="slide" onRequestClose={() => setModalContatosVisivel(false)}>
-        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setModalContatosVisivel(false)}>
-          <TouchableOpacity activeOpacity={1} style={styles.modalBox}>
+      <ModalDeslizante
+        visivel={modalContatosVisivel}
+        onFechar={fecharContatos}
+        estiloFundo={styles.modalOverlay}
+        estiloPainel={styles.modalBox}
+      >
             <ScrollView showsVerticalScrollIndicator={false}>
               <View style={styles.dragIndicator} />
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}>
                 <Text style={styles.modalTitle}>Contatos de Emergência (SOS)</Text>
-                <TouchableOpacity onPress={() => setModalContatosVisivel(false)} style={styles.closeButtonMini}>
-                  <Text style={{ fontSize: 16, fontWeight: 'bold' }}>✕</Text>
+                <TouchableOpacity onPress={fecharContatos} style={styles.closeButtonMini}>
+                  <Text escalavel={false} style={{ fontSize: 16, fontWeight: 'bold', color: cores.text }}>✕</Text>
                 </TouchableOpacity>
               </View>
 
-              <Text style={[styles.sectionLabel, { marginBottom: 15, color: '#5f6368' }]}>
+              <Text style={[styles.sectionLabel, { marginBottom: 15, color: cores.textMuted }]}>
                 Em caso de perigo imediato, ligue para os serviços de emergência:
               </Text>
 
               <TouchableOpacity 
-                style={[styles.modalButton, { backgroundColor: '#d93025', marginBottom: 10, padding: 12, borderRadius: 8 }]} 
+                style={[styles.modalButton, { backgroundColor: cores.dangerButton, marginBottom: 10, padding: 12, borderRadius: 8 }]} 
                 onPress={() => Linking.openURL('tel:193')}
               >
-                <Text style={{ color: '#fff', fontWeight: 'bold', textAlign: 'center' }}>🚨 Bombeiros: 193</Text>
+                <Text style={{ color: cores.onButton, fontWeight: 'bold', textAlign: 'center' }}>🚨 Bombeiros: 193</Text>
               </TouchableOpacity>
 
               <TouchableOpacity 
-                style={[styles.modalButton, { backgroundColor: '#1a73e8', marginBottom: 10, padding: 12, borderRadius: 8 }]} 
+                style={[styles.modalButton, { backgroundColor: cores.button, marginBottom: 10, padding: 12, borderRadius: 8 }]} 
                 onPress={() => Linking.openURL('tel:199')}
               >
-                <Text style={{ color: '#fff', fontWeight: 'bold', textAlign: 'center' }}>🛡️ Defesa Civil: 199</Text>
+                <Text style={{ color: cores.onButton, fontWeight: 'bold', textAlign: 'center' }}>🛡️ Defesa Civil: 199</Text>
               </TouchableOpacity>
 
               <TouchableOpacity 
                 style={[styles.modalButton, { backgroundColor: '#34a853', marginBottom: 20, padding: 12, borderRadius: 8 }]} 
                 onPress={() => Linking.openURL('tel:190')}
               >
-                <Text style={{ color: '#fff', fontWeight: 'bold', textAlign: 'center' }}>👮 Polícia: 190</Text>
+                <Text style={{ color: cores.onButton, fontWeight: 'bold', textAlign: 'center' }}>👮 Polícia: 190</Text>
               </TouchableOpacity>
 
               <TouchableOpacity 
                 style={[styles.modalButton, styles.cancelButton]} 
-                onPress={() => setModalContatosVisivel(false)}
+                onPress={fecharContatos}
               >
                 <Text style={styles.cancelText}>Fechar</Text>
               </TouchableOpacity>
             </ScrollView>
-          </TouchableOpacity>
-        </TouchableOpacity>
-      </Modal>
+      </ModalDeslizante>
 
       {/* Modal de Alerta de Emergência Automático (Orientações, Checklist e Contactos) */}
-      <Modal 
-        visible={modalEmergenciaVisivel} 
-        transparent 
-        animationType="slide" 
-        onRequestClose={() => setModalEmergenciaVisivel(false)}
+      <ModalDeslizante
+        visivel={modalEmergenciaVisivel}
+        onFechar={() => setModalEmergenciaVisivel(false)}
+        estiloFundo={styles.modalOverlay}
+        estiloPainel={styles.modalBox}
       >
-        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setModalEmergenciaVisivel(false)}>
-          <TouchableOpacity activeOpacity={1} style={styles.modalBox}>
             <ScrollView showsVerticalScrollIndicator={false}>
               <View style={styles.dragIndicator} />
               
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
                   <Text style={{ fontSize: 24, marginRight: 8 }}>🔴</Text>
-                  <Text style={[styles.modalTitle, { color: '#d93025' }]}>Alerta de emergência</Text>
+                  <Text style={[styles.modalTitle, { color: cores.danger }]}>Alerta de emergência</Text>
                 </View>
                 <TouchableOpacity onPress={() => setModalEmergenciaVisivel(false)} style={styles.closeButtonMini}>
-                  <Text style={{ fontSize: 16, fontWeight: 'bold' }}>✕</Text>
+                  <Text escalavel={false} style={{ fontSize: 16, fontWeight: 'bold', color: cores.text }}>✕</Text>
                 </TouchableOpacity>
               </View>
 
-              <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#202124', marginBottom: 8 }}>
+              <Text style={{ fontSize: 14, fontWeight: 'bold', color: cores.textStrong, marginBottom: 8 }}>
                 {alertaEmergencia?.tipo || 'Deslizamento'} na sua área
               </Text>
 
-              <View style={{ backgroundColor: '#fce8e6', padding: 12, borderRadius: 8, marginBottom: 16 }}>
-                <Text style={{ color: '#c5221f', fontWeight: '500' }}>
+              <View style={{ backgroundColor: cores.dangerBackground, padding: 12, borderRadius: 8, marginBottom: 16 }}>
+                <Text style={{ color: cores.dangerStrong, fontWeight: '500' }}>
                   {alertaEmergencia?.comentario || 'Deslizamento de terra'}
                 </Text>
               </View>
 
-              <Text style={[styles.sectionLabel, { fontSize: 16, fontWeight: 'bold', color: '#202124', marginBottom: 12 }]}>
+              <Text style={[styles.sectionLabel, { fontSize: 16, fontWeight: 'bold', color: cores.textStrong, marginBottom: 12 }]}>
                 O que fazer agora
               </Text>
 
               <View style={{ flexDirection: 'row', marginBottom: 10, alignItems: 'flex-start' }}>
-                <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: '#d93025', justifyContent: 'center', alignItems: 'center', marginRight: 10, marginTop: 2 }}>
-                  <Text style={{ color: '#fff', fontSize: 12, fontWeight: 'bold' }}>1</Text>
+                <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: cores.dangerButton, justifyContent: 'center', alignItems: 'center', marginRight: 10, marginTop: 2 }}>
+                  <Text escalavel={false} style={{ color: cores.onButton, fontSize: 12, fontWeight: 'bold' }}>1</Text>
                 </View>
-                <Text style={{ flex: 1, fontSize: 14, color: '#3c4043', lineHeight: 20 }}>Mantenha a calma e siga as orientações das autoridades.</Text>
+                <Text style={{ flex: 1, fontSize: 14, color: cores.textSecondary, lineHeight: 20 }}>Mantenha a calma e siga as orientações das autoridades.</Text>
               </View>
 
               <View style={{ flexDirection: 'row', marginBottom: 10, alignItems: 'flex-start' }}>
-                <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: '#d93025', justifyContent: 'center', alignItems: 'center', marginRight: 10, marginTop: 2 }}>
-                  <Text style={{ color: '#fff', fontSize: 12, fontWeight: 'bold' }}>2</Text>
+                <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: cores.dangerButton, justifyContent: 'center', alignItems: 'center', marginRight: 10, marginTop: 2 }}>
+                  <Text escalavel={false} style={{ color: cores.onButton, fontSize: 12, fontWeight: 'bold' }}>2</Text>
                 </View>
-                <Text style={{ flex: 1, fontSize: 14, color: '#3c4043', lineHeight: 20 }}>Saia pela rota segura; não atravesse água, fumaça ou área interditada.</Text>
+                <Text style={{ flex: 1, fontSize: 14, color: cores.textSecondary, lineHeight: 20 }}>Saia pela rota segura; não atravesse água, fumaça ou área interditada.</Text>
               </View>
 
               <View style={{ flexDirection: 'row', marginBottom: 10, alignItems: 'flex-start' }}>
-                <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: '#d93025', justifyContent: 'center', alignItems: 'center', marginRight: 10, marginTop: 2 }}>
-                  <Text style={{ color: '#fff', fontSize: 12, fontWeight: 'bold' }}>3</Text>
+                <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: cores.dangerButton, justifyContent: 'center', alignItems: 'center', marginRight: 10, marginTop: 2 }}>
+                  <Text escalavel={false} style={{ color: cores.onButton, fontSize: 12, fontWeight: 'bold' }}>3</Text>
                 </View>
-                <Text style={{ flex: 1, fontSize: 14, color: '#3c4043', lineHeight: 20 }}>Se houver tempo e segurança, desligue energia e gás antes de sair.</Text>
+                <Text style={{ flex: 1, fontSize: 14, color: cores.textSecondary, lineHeight: 20 }}>Se houver tempo e segurança, desligue energia e gás antes de sair.</Text>
               </View>
 
               <View style={{ flexDirection: 'row', marginBottom: 10, alignItems: 'flex-start' }}>
-                <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: '#d93025', justifyContent: 'center', alignItems: 'center', marginRight: 10, marginTop: 2 }}>
-                  <Text style={{ color: '#fff', fontSize: 12, fontWeight: 'bold' }}>4</Text>
+                <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: cores.dangerButton, justifyContent: 'center', alignItems: 'center', marginRight: 10, marginTop: 2 }}>
+                  <Text escalavel={false} style={{ color: cores.onButton, fontSize: 12, fontWeight: 'bold' }}>4</Text>
                 </View>
-                <Text style={{ flex: 1, fontSize: 14, color: '#3c4043', lineHeight: 20 }}>Ajude crianças, idosos, pessoas com deficiência e animais.</Text>
+                <Text style={{ flex: 1, fontSize: 14, color: cores.textSecondary, lineHeight: 20 }}>Ajude crianças, idosos, pessoas com deficiência e animais.</Text>
               </View>
 
               <View style={{ flexDirection: 'row', marginBottom: 10, alignItems: 'flex-start' }}>
-                <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: '#d93025', justifyContent: 'center', alignItems: 'center', marginRight: 10, marginTop: 2 }}>
-                  <Text style={{ color: '#fff', fontSize: 12, fontWeight: 'bold' }}>5</Text>
+                <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: cores.dangerButton, justifyContent: 'center', alignItems: 'center', marginRight: 10, marginTop: 2 }}>
+                  <Text escalavel={false} style={{ color: cores.onButton, fontSize: 12, fontWeight: 'bold' }}>5</Text>
                 </View>
-                <Text style={{ flex: 1, fontSize: 14, color: '#3c4043', lineHeight: 20 }}>Vá para um abrigo ou ponto seguro indicado no aplicativo.</Text>
+                <Text style={{ flex: 1, fontSize: 14, color: cores.textSecondary, lineHeight: 20 }}>Vá para um abrigo ou ponto seguro indicado no aplicativo.</Text>
               </View>
 
               <View style={{ flexDirection: 'row', marginBottom: 16, alignItems: 'flex-start' }}>
-                <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: '#d93025', justifyContent: 'center', alignItems: 'center', marginRight: 10, marginTop: 2 }}>
-                  <Text style={{ color: '#fff', fontSize: 12, fontWeight: 'bold' }}>6</Text>
+                <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: cores.dangerButton, justifyContent: 'center', alignItems: 'center', marginRight: 10, marginTop: 2 }}>
+                  <Text escalavel={false} style={{ color: cores.onButton, fontSize: 12, fontWeight: 'bold' }}>6</Text>
                 </View>
-                <Text style={{ flex: 1, fontSize: 14, color: '#3c4043', lineHeight: 20 }}>Não volte ao local até a liberação oficial.</Text>
+                <Text style={{ flex: 1, fontSize: 14, color: cores.textSecondary, lineHeight: 20 }}>Não volte ao local até a liberação oficial.</Text>
               </View>
 
-              <Text style={[styles.sectionLabel, { fontSize: 16, fontWeight: 'bold', color: '#202124', marginBottom: 12 }]}>
+              <Text style={[styles.sectionLabel, { fontSize: 16, fontWeight: 'bold', color: cores.textStrong, marginBottom: 12 }]}>
                 Checklist para evacuação
               </Text>
 
@@ -822,60 +894,58 @@ export default function MapScreen() {
                 'Itens essenciais para crianças, idosos e animais'
               ].map((item, idx) => (
                 <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-                  <Text style={{ fontSize: 16, marginRight: 8 }}>☐</Text>
-                  <Text style={{ fontSize: 14, color: '#3c4043' }}>{item}</Text>
+                  <Text style={{ fontSize: 16, marginRight: 8, color: cores.text }}>☐</Text>
+                  <Text style={{ flex: 1, fontSize: 14, color: cores.textSecondary }}>{item}</Text>
                 </View>
               ))}
 
-              <Text style={[styles.sectionLabel, { fontSize: 16, fontWeight: 'bold', color: '#202124', marginTop: 12, marginBottom: 12 }]}>
+              <Text style={[styles.sectionLabel, { fontSize: 16, fontWeight: 'bold', color: cores.textStrong, marginTop: 12, marginBottom: 12 }]}>
                 Contatos de emergência
               </Text>
 
               <TouchableOpacity 
-                style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#f8f9fa', padding: 12, borderRadius: 8, marginBottom: 8 }}
+                style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: cores.surfaceSubtle, padding: 12, borderRadius: 8, marginBottom: 8 }}
                 onPress={() => Linking.openURL('tel:199')}
               >
-                <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#202124' }}>🛡️ Defesa Civil</Text>
-                <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#d93025' }}>Ligar 199</Text>
+                <Text style={{ fontSize: 14, fontWeight: 'bold', color: cores.textStrong }}>🛡️ Defesa Civil</Text>
+                <Text style={{ fontSize: 14, fontWeight: 'bold', color: cores.danger }}>Ligar 199</Text>
               </TouchableOpacity>
 
               <TouchableOpacity 
-                style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#f8f9fa', padding: 12, borderRadius: 8, marginBottom: 8 }}
+                style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: cores.surfaceSubtle, padding: 12, borderRadius: 8, marginBottom: 8 }}
                 onPress={() => Linking.openURL('tel:193')}
               >
-                <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#202124' }}>🚒 Bombeiros</Text>
-                <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#d93025' }}>Ligar 193</Text>
+                <Text style={{ fontSize: 14, fontWeight: 'bold', color: cores.textStrong }}>🚒 Bombeiros</Text>
+                <Text style={{ fontSize: 14, fontWeight: 'bold', color: cores.danger }}>Ligar 193</Text>
               </TouchableOpacity>
 
               <TouchableOpacity 
-                style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#f8f9fa', padding: 12, borderRadius: 8, marginBottom: 12 }}
+                style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: cores.surfaceSubtle, padding: 12, borderRadius: 8, marginBottom: 12 }}
                 onPress={() => Linking.openURL('tel:192')}
               >
-                <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#202124' }}>🚑 SAMU</Text>
-                <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#d93025' }}>Ligar 192</Text>
+                <Text style={{ fontSize: 14, fontWeight: 'bold', color: cores.textStrong }}>🚑 SAMU</Text>
+                <Text style={{ fontSize: 14, fontWeight: 'bold', color: cores.danger }}>Ligar 192</Text>
               </TouchableOpacity>
 
-              <View style={{ backgroundColor: '#e8f0fe', padding: 12, borderRadius: 8, marginBottom: 16 }}>
-                <Text style={{ fontSize: 12, color: '#1a73e8' }}>
+              <View style={{ backgroundColor: cores.tintBackground, padding: 12, borderRadius: 8, marginBottom: 16 }}>
+                <Text style={{ fontSize: 12, color: cores.tint }}>
                   📲 Estas instruções ficam disponíveis no aplicativo mesmo sem internet.
                 </Text>
               </View>
 
               <TouchableOpacity 
-                style={[styles.modalButton, { backgroundColor: '#1a73e8', padding: 14, borderRadius: 8, marginBottom: 10 }]} 
+                style={[styles.modalButton, { backgroundColor: cores.button, padding: 14, borderRadius: 8, marginBottom: 10 }]} 
                 onPress={() => {
                   setModalEmergenciaVisivel(false);
                   router.push('/abrigos');
                 }}
               >
-                <Text style={{ color: '#fff', fontWeight: 'bold', textAlign: 'center', fontSize: 15 }}>
+                <Text style={{ color: cores.onButton, fontWeight: 'bold', textAlign: 'center', fontSize: 15 }}>
                   🏠 Ver abrigos e pontos seguros
                 </Text>
               </TouchableOpacity>
             </ScrollView>
-          </TouchableOpacity>
-        </TouchableOpacity>
-      </Modal>
+      </ModalDeslizante>
 
     </View>
   );

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Alert, FlatList, Image, Linking, Modal, ScrollView, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, FlatList, Image, Linking, ScrollView, Switch, TouchableOpacity, View } from 'react-native';
+import { Text, TextInput } from '../../components/texto';
 import { addDoc, collection, deleteDoc, doc, getFirestore, onSnapshot, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import { FontAwesome6 } from '@expo/vector-icons';
@@ -13,8 +13,10 @@ import { distanciaKm } from '../../services/proximityNotifications';
 import { pesquisarEnderecos } from '../../services/addressSearch';
 import { uploadImage } from '../../services/imageUpload';
 import CameraCaptura from '../../components/camera-captura';
+import ModalDeslizante from '../../components/modal-deslizante';
 import app, { auth } from '../../services/firebaseConfig';
-import styles from '../../styles/abrigos.styles';
+import estilosAbrigos from '../../styles/abrigos.styles';
+import { useEstilos, useTema } from '../../hooks/use-tema';
 
 const db = getFirestore(app);
 
@@ -35,6 +37,8 @@ function corSituacao(situacao) {
 }
 
 export default function AbrigosScreen() {
+  const styles = useEstilos(estilosAbrigos);
+  const { cores } = useTema();
   const [abrigos, setAbrigos] = useState([]);
   const [localizacao, setLocalizacao] = useState(null);
   const [filtro, setFiltro] = useState('Todos');
@@ -47,7 +51,6 @@ export default function AbrigosScreen() {
   const [resultadosEndereco, setResultadosEndereco] = useState([]);
   const [buscandoEndereco, setBuscandoEndereco] = useState(false);
   const [administrador, setAdministrador] = useState(false);
-  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     let pararAdmin = () => {};
@@ -269,20 +272,33 @@ export default function AbrigosScreen() {
       />
 
       {administrador && (
-        <TouchableOpacity style={[styles.addButton, { marginBottom: insets.bottom - 130 }]} onPress={abrirNovo}>
-          <FontAwesome6 name="plus" size={24} color="black" />
+        <TouchableOpacity style={styles.addButton} onPress={abrirNovo}>
+          <FontAwesome6 name="plus" size={24} color={cores.icon} />
         </TouchableOpacity>
       )}
 
-      <Modal visible={modalVisivel} transparent animationType="slide" onRequestClose={() => setModalVisivel(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalBox}>
+      {/* A câmera fica dentro do Modal do abrigo para abrir por cima dele */}
+      <ModalDeslizante
+        visivel={modalVisivel}
+        onFechar={() => setModalVisivel(false)}
+        estiloFundo={styles.modalOverlay}
+        estiloPainel={styles.modalBox}
+        fecharAoTocarFora={false}
+        sobreposto={(
+          <CameraCaptura
+            visivel={cameraVisivel}
+            onFechar={() => setCameraVisivel(false)}
+            onFotoTirada={uri => alterarCampo('fotoUrl', uri)}
+          />
+        )}
+      >
             <ScrollView showsVerticalScrollIndicator={false}>
               <Text style={styles.modalTitle}>{editandoId ? 'Editar local' : 'Cadastrar local seguro'}</Text>
-              <TextInput style={styles.input} placeholder="Nome do local" value={formulario.nome} onChangeText={valor => alterarCampo('nome', valor)} />
+              <TextInput style={styles.input} placeholderTextColor={cores.placeholder} placeholder="Nome do local" value={formulario.nome} onChangeText={valor => alterarCampo('nome', valor)} />
               <Text style={styles.label}>Localização do abrigo</Text>
               <TextInput
                 style={styles.searchInput}
+                placeholderTextColor={cores.placeholder}
                 placeholder="Nome do local, rua, número e cidade"
                 value={buscaEndereco}
                 onChangeText={valor => {
@@ -319,9 +335,9 @@ export default function AbrigosScreen() {
               <Text style={styles.label}>Situação atual</Text>
               <View style={styles.options}>{SITUACOES.map(item => <TouchableOpacity key={item} onPress={() => alterarCampo('situacao', item)} style={[styles.option, formulario.situacao === item && styles.optionActive]}><Text style={[styles.optionText, formulario.situacao === item && styles.optionTextActive]}>{item}</Text></TouchableOpacity>)}</View>
 
-              <TextInput style={styles.input} placeholder="Telefone" value={formulario.telefone} onChangeText={valor => alterarCampo('telefone', valor)} keyboardType="phone-pad" />
-              <TextInput style={styles.input} placeholder="Horário de funcionamento" value={formulario.horario} onChangeText={valor => alterarCampo('horario', valor)} />
-              <TextInput style={styles.input} placeholder="Capacidade aproximada" value={String(formulario.capacidade || '')} onChangeText={valor => alterarCampo('capacidade', valor)} keyboardType="numeric" />
+              <TextInput style={styles.input} placeholderTextColor={cores.placeholder} placeholder="Telefone" value={formulario.telefone} onChangeText={valor => alterarCampo('telefone', valor)} keyboardType="phone-pad" />
+              <TextInput style={styles.input} placeholderTextColor={cores.placeholder} placeholder="Horário de funcionamento" value={formulario.horario} onChangeText={valor => alterarCampo('horario', valor)} />
+              <TextInput style={styles.input} placeholderTextColor={cores.placeholder} placeholder="Capacidade aproximada" value={String(formulario.capacidade || '')} onChangeText={valor => alterarCampo('capacidade', valor)} keyboardType="numeric" />
 
               <View style={styles.switchRow}><Text style={styles.switchLabel}>♿ Possui acessibilidade</Text><Switch value={formulario.acessivel} onValueChange={valor => alterarCampo('acessivel', valor)} /></View>
               <View style={styles.switchRow}><Text style={styles.switchLabel}>🐾 Aceita animais</Text><Switch value={formulario.aceitaAnimais} onValueChange={valor => alterarCampo('aceitaAnimais', valor)} /></View>
@@ -337,15 +353,7 @@ export default function AbrigosScreen() {
                 <TouchableOpacity style={styles.saveButton} onPress={salvarAbrigo} disabled={salvando}><Text style={styles.saveText}>{salvando ? 'Salvando...' : 'Salvar'}</Text></TouchableOpacity>
               </View>
             </ScrollView>
-          </View>
-        </View>
-        {/* Fica dentro do Modal do abrigo para abrir por cima dele. */}
-        <CameraCaptura
-          visivel={cameraVisivel}
-          onFechar={() => setCameraVisivel(false)}
-          onFotoTirada={uri => alterarCampo('fotoUrl', uri)}
-        />
-      </Modal>
+      </ModalDeslizante>
     </View>
   );
 }

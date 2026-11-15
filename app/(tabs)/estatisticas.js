@@ -1,10 +1,12 @@
-import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, ScrollView, View } from 'react-native';
+import { Text } from '../../components/texto';
 import { useEffect, useMemo, useState } from 'react';
 import { collection, getFirestore, onSnapshot } from 'firebase/firestore';
 import Mapbox from '@rnmapbox/maps';
 import app from '../../services/firebaseConfig';
 import { STATUS_ALERTA, statusEfetivo } from '../../services/alertLifecycle';
-import styles from '../../styles/estatisticas.styles';
+import estilosEstatisticas from '../../styles/estatisticas.styles';
+import { useEstilos, useTema } from '../../hooks/use-tema';
 
 const db = getFirestore(app);
 const TIPOS = ['Alagamento', 'Enchente', 'Deslizamento', 'Vendaval','Incêndio florestal'];
@@ -20,7 +22,8 @@ function contarPor(lista, campo, opcoes = null) {
   return itens.sort((a, b) => b.total - a.total);
 }
 
-function Barra({ nome, total, maximo, cor = '#1a73e8' }) {
+// styles vem da tela, conforme o tema ativo
+function Barra({ nome, total, maximo, cor = '#1a73e8', styles }) {
   const largura = total === 0 || maximo === 0 ? 0 : Math.max(5, (total / maximo) * 100);
   return <View style={styles.barItem}>
     <View style={styles.barHeader}><Text style={styles.barLabel}>{nome}</Text><Text style={styles.barValue}>{total}</Text></View>
@@ -29,6 +32,8 @@ function Barra({ nome, total, maximo, cor = '#1a73e8' }) {
 }
 
 export default function EstatisticasPublicas() {
+  const styles = useEstilos(estilosEstatisticas);
+  const { cores, escuro } = useTema();
   const [ocorrencias, setOcorrencias] = useState([]);
   const [carregando, setCarregando] = useState(true);
 
@@ -85,7 +90,7 @@ const heatmapGeoJSON = useMemo(() => {
     return [longitude, latitude];
   }, [heatmapGeoJSON]);
 
-  if (carregando) return <View style={styles.center}><ActivityIndicator size="large" color="#1a73e8" /><Text style={styles.loading}>Carregando estatísticas...</Text></View>;
+  if (carregando) return <View style={styles.center}><ActivityIndicator size="large" color={cores.tint} /><Text style={styles.loading}>Carregando estatísticas...</Text></View>;
 
   const maiorTipo = Math.max(1, ...dados.tipos.map(item => item.total));
   const maiorGravidade = Math.max(1, ...dados.gravidades.map(item => item.total));
@@ -119,7 +124,7 @@ const heatmapGeoJSON = useMemo(() => {
           pitchEnabled={false}
           logoEnabled={false}
           attributionEnabled={false}
-          styleURL="mapbox://styles/mapbox/streets-v12"
+          styleURL={escuro ? 'mapbox://styles/mapbox/navigation-night-v1' : 'mapbox://styles/mapbox/streets-v12'}
         >
           <Mapbox.Camera
             defaultSettings={{
@@ -155,17 +160,17 @@ const heatmapGeoJSON = useMemo(() => {
 
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>Ocorrências por período</Text>
-      {dados.periodos.map(item => <Barra key={item.nome} {...item} maximo={maiorPeriodo} cor="#00897b" />)}
+      {dados.periodos.map(item => <Barra key={item.nome} {...item} maximo={maiorPeriodo} cor="#00897b" styles={styles} />)}
     </View>
 
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>Ocorrências por situação</Text>
-      {dados.status.map(item => <Barra key={item.nome} {...item} maximo={maiorStatus} cor={item.cor || '#1a73e8'} />)}
+      {dados.status.map(item => <Barra key={item.nome} {...item} maximo={maiorStatus} cor={item.cor || '#1a73e8'} styles={styles} />)}
     </View>
 
-    <View style={styles.section}><Text style={styles.sectionTitle}>Ocorrências por tipo</Text>{dados.tipos.map(item => <Barra key={item.nome} {...item} maximo={maiorTipo} />)}</View>
-    <View style={styles.section}><Text style={styles.sectionTitle}>Ocorrências por gravidade</Text>{dados.gravidades.map(item => <Barra key={item.nome} {...item} maximo={maiorGravidade} cor={{ Atenção: '#f9ab00', Alerta: '#e8710a', Emergência: '#d93025' }[item.nome]} />)}</View>
-    <View style={styles.section}><Text style={styles.sectionTitle}>Bairros com mais registros (até 8)</Text>{dados.bairros.length ? dados.bairros.map(item => <Barra key={item.nome} {...item} maximo={maiorBairro} cor="#7b1fa2" />) : <Text style={styles.empty}>Ainda não há bairros informados.</Text>}</View>
+    <View style={styles.section}><Text style={styles.sectionTitle}>Ocorrências por tipo</Text>{dados.tipos.map(item => <Barra key={item.nome} {...item} maximo={maiorTipo} styles={styles} />)}</View>
+    <View style={styles.section}><Text style={styles.sectionTitle}>Ocorrências por gravidade</Text>{dados.gravidades.map(item => <Barra key={item.nome} {...item} maximo={maiorGravidade} cor={{ Atenção: '#f9ab00', Alerta: '#e8710a', Emergência: '#d93025' }[item.nome]} styles={styles} />)}</View>
+    <View style={styles.section}><Text style={styles.sectionTitle}>Bairros com mais registros (até 8)</Text>{dados.bairros.length ? dados.bairros.map(item => <Barra key={item.nome} {...item} maximo={maiorBairro} cor="#7b1fa2" styles={styles} />) : <Text style={styles.empty}>Ainda não há bairros informados.</Text>}</View>
 
     <View style={styles.privacyBox}><Text style={styles.privacyTitle}>🔒 Painel somente para consulta</Text><Text style={styles.privacyText}>Usuários e visitantes não podem editar estes dados. Informações de administradores e moradores não aparecem nesta tela.</Text></View>
   </ScrollView>;

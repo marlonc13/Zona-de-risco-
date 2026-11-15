@@ -1,10 +1,13 @@
 import { useEffect } from 'react';
 import { View, Image, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
-import styles from '../styles/index.styles';
+import estilosIndex from '../styles/index.styles';
+import { useEstilos, useTema } from '../hooks/use-tema';
 
 export default function SplashScreen() {
   const router = useRouter();
+  const styles = useEstilos(estilosIndex);
+  const { cores } = useTema();
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -17,11 +20,11 @@ export default function SplashScreen() {
   return (
     <View style={styles.container}>
       <Image 
-        source={require('../assets/images/icon.png')} 
+        source={require('../assets/images/splash-icon.png')} 
         style={styles.logo} 
         resizeMode="contain"
       />
-      <ActivityIndicator size="large" color="#1a73e8" style={{ marginTop: 24 }} />
+      <ActivityIndicator size="large" color={cores.tint} style={{ marginTop: 24 }} />
     </View>
   );
 }

@@ -1,8 +1,12 @@
-import { View, Text, FlatList, Image, ActivityIndicator, TouchableOpacity, Alert, Modal, TextInput, ScrollView } from 'react-native';
+import { View, FlatList, Image, ActivityIndicator, TouchableOpacity, Alert, Modal, ScrollView } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Text, TextInput } from '../../components/texto';
+import ModalDeslizante from '../../components/modal-deslizante';
 import { useState, useEffect, useMemo } from 'react';
 import { getFirestore, collection, onSnapshot, doc, updateDoc, deleteDoc, serverTimestamp, arrayUnion } from 'firebase/firestore';
 import app, { auth } from '../../services/firebaseConfig';
-import styles from '../../styles/lista.styles';
+import estilosLista from '../../styles/lista.styles';
+import { useEstilos, useTema } from '../../hooks/use-tema';
 import { onAuthStateChanged } from 'firebase/auth';
 import { useRouter } from 'expo-router';
 import { observarStatusAdministrador } from '../../services/accessControl';
@@ -89,6 +93,9 @@ const obterDataAtual = () => Date.now();
 
 export default function ListaAlertasScreen() {
   const router = useRouter();
+  const styles = useEstilos(estilosLista);
+  const insets = useSafeAreaInsets();
+  const { cores, escuro } = useTema();
   const [alertas, setAlertas] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [editando, setEditando] = useState(null);
@@ -345,7 +352,7 @@ export default function ListaAlertasScreen() {
   if (carregando) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#1a73e8" />
+        <ActivityIndicator size="large" color={cores.tint} />
       </View>
     );
   }
@@ -362,7 +369,7 @@ export default function ListaAlertasScreen() {
             style={[styles.filterToggle, { flexDirection: 'row', alignItems: 'center', gap: 6 }]}
             onPress={() => setFiltrosVisiveis(atual => !atual)}
           >
-            <Ionicons name="options" size={16} color="#1a73e8" />
+            <Ionicons name="options" size={16} color={cores.tint} />
             <Text style={styles.filterToggleText}>Filtros</Text>
           </TouchableOpacity>
         </View>
@@ -386,7 +393,7 @@ export default function ListaAlertasScreen() {
           </ScrollView>
 
           <Text style={styles.filterLabel}>Bairro</Text>
-          <TextInput style={styles.filterInput} placeholder="Digite o nome do bairro" value={bairroFiltro} onChangeText={setBairroFiltro} />
+          <TextInput style={styles.filterInput} placeholder="Digite o nome do bairro" placeholderTextColor={cores.placeholder} value={bairroFiltro} onChangeText={setBairroFiltro} />
 
           <Text style={styles.filterLabel}>Tipo de risco</Text>
           <ScrollView
@@ -415,7 +422,7 @@ export default function ListaAlertasScreen() {
                 >
                   <Text
                     style={{
-                      color: selecionado ? '#FFFFFF' : '#3c4043',
+                      color: selecionado ? cores.onButton : cores.textSecondary,
                       fontSize: 12,
                       fontWeight: '700',
                     }}
@@ -439,7 +446,7 @@ export default function ListaAlertasScreen() {
               return (
                 <TouchableOpacity key={item.id} onPress={() => setStatusFiltro(item.id)} style={[styles.filterChip, ativo && styles.filterChipActive]}>
                   <Text style={[styles.filterChipText, ativo && styles.filterChipTextActive]}>
-                    <IconeStatus id={item.id} color={ativo ? '#fff' : '#5f6368'} /> {item.label}
+                    <IconeStatus id={item.id} color={ativo ? cores.onButton : cores.textMuted} /> {item.label}
                   </Text>
                 </TouchableOpacity>
               );
@@ -453,7 +460,13 @@ export default function ListaAlertasScreen() {
   );
 
   return (
-    <ScreenWrapper includeTop={false} includeBottom={false} dismissOnPress={false}>
+    <ScreenWrapper
+      includeTop={false}
+      includeBottom={false}
+      dismissOnPress={false}
+      // no escuro a sombra some; o fundo mais escuro separa os cartões
+      backgroundColor={escuro ? cores.screen : undefined}
+    >
       <FlatList
         data={alertasFiltrados}
         keyExtractor={item => item.id}
@@ -478,7 +491,7 @@ export default function ListaAlertasScreen() {
                 <Image source={{ uri: item.fotoUrl }} style={styles.cardImage} />
               ) : (
                 <View style={styles.noImagePlaceholder}>
-                  <IconeTipo tipo={item.tipo} size={32} />
+                  <IconeTipo tipo={item.tipo} size={32} color={cores.tint} />
                   <Text style={styles.noImageText}>Sem foto anexada</Text>
                 </View>
               )}
@@ -489,23 +502,23 @@ export default function ListaAlertasScreen() {
                 </Text>
                 <Text style={item.oficial === true ? styles.officialBadge : styles.previousBadge}>
                   {statusAtual === 'rascunho'
-                    ? <><MaterialCommunityIcons name="file-document-edit-outline" size={13} color="#5f6368" /> NÃO PUBLICADO</>
+                    ? <><MaterialCommunityIcons name="file-document-edit-outline" size={13} color={cores.textMuted} /> NÃO PUBLICADO</>
                     : item.oficial === true
                       ? <><Ionicons name="checkmark-circle" size={13} color="#188038" /> ALERTA OFICIAL</>
                       : 'REGISTRO ANTERIOR'}
                 </Text>
                 <View style={styles.cardHeaderRow}>
-                  <Text style={styles.cardTitle}><IconeTipo tipo={item.tipo} size={18} /> {item.tipo}</Text>
+                  <Text style={styles.cardTitle}><IconeTipo tipo={item.tipo} size={18} color={cores.tint} /> {item.tipo}</Text>
                   {item.expiresAt ? <Text style={styles.cardTime}>Expira às {new Date(item.expiresAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text> : <Text style={styles.cardTime}>Sem publicação</Text>}
                 </View>
 
                 <Text style={styles.cardDescription}>{item.comentario}</Text>
-                <Text style={styles.neighborhood}><Ionicons name="location" size={14} color="#1a73e8" /> Bairro: {item.bairro || 'Não informado'}</Text>
+                <Text style={styles.neighborhood}><Ionicons name="location" size={14} color={cores.tint} /> Bairro: {item.bairro || 'Não informado'}</Text>
                 <View style={styles.riskRow}>
                   <Text style={styles.optionText}>
                     <IconeGravidade
                       label={item.gravidade || 'Atenção'}
-                      color="#5f6368"
+                      color={cores.textMuted}
                     />{' '}
                     {gravidadeDados.label || item.gravidade || 'Atenção'}
                   </Text>
@@ -515,7 +528,7 @@ export default function ListaAlertasScreen() {
                   </Text>
                 </View>
                 <View style={styles.guidanceBox}>
-                  <Text style={styles.guidanceTitle}><Ionicons name="shield-checkmark" size={15} color="#1a73e8" /> Como se proteger</Text>
+                  <Text style={styles.guidanceTitle}><Ionicons name="shield-checkmark" size={15} color={cores.tint} /> Como se proteger</Text>
                   <Text style={styles.guidanceText}>{orientacaoDoRisco(item.tipo)}</Text>
                 </View>
 
@@ -527,20 +540,20 @@ export default function ListaAlertasScreen() {
 
                 <View style={styles.actions}>
                   <TouchableOpacity style={[styles.detailsAction, { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }]} onPress={() => router.push(`/ocorrencia/${item.id}`)}>
-                    <Ionicons name="search" size={16} color="#1a73e8" />
+                    <Ionicons name="search" size={16} color={cores.tint} />
                     <Text style={styles.detailsActionText}>Detalhes</Text>
                   </TouchableOpacity>
                   {administrador && <>
                     <TouchableOpacity style={[styles.editAction, { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }]} onPress={() => abrirEdicao(item)}>
-                      <Ionicons name="create-outline" size={16} color="#1a73e8" />
+                      <Ionicons name="create-outline" size={16} color={cores.tint} />
                       <Text style={styles.editActionText}>Editar</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={[styles.closeAction, { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }]} onPress={() => setAlterandoStatus(item)}>
-                      <MaterialCommunityIcons name="swap-horizontal" size={16} color="#1a73e8" />
+                      <MaterialCommunityIcons name="swap-horizontal" size={16} color={cores.tint} />
                       <Text style={styles.closeActionText}>Alterar situação</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={[styles.deleteAction, { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }]} onPress={() => excluirAlerta(item)}>
-                      <Ionicons name="trash-outline" size={16} color="#d93025" />
+                      <Ionicons name="trash-outline" size={16} color={cores.danger} />
                       <Text style={styles.deleteActionText}>Excluir</Text>
                     </TouchableOpacity>
                   </>}
@@ -551,8 +564,8 @@ export default function ListaAlertasScreen() {
         }}
         />
 
-      <Modal visible={administrador && !!alterandoStatus} transparent animationType="fade" onRequestClose={() => setAlterandoStatus(null)}>
-        <View style={styles.statusModalOverlay}>
+      <Modal visible={administrador && !!alterandoStatus} transparent animationType="fade" statusBarTranslucent navigationBarTranslucent onRequestClose={() => setAlterandoStatus(null)}>
+        <View style={[styles.statusModalOverlay, { paddingTop: 18 + insets.top, paddingBottom: 18 + insets.bottom }]}>
           <View style={styles.statusModalBox}>
             <Text style={styles.modalTitle}>Alterar situação</Text>
             <Text style={styles.statusModalSubtitle}>
@@ -641,16 +654,20 @@ export default function ListaAlertasScreen() {
         </View>
       </Modal>
 
-      <Modal visible={administrador && !!editando} transparent animationType="slide" onRequestClose={() => setEditando(null)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalBox}>
+      <ModalDeslizante
+        visivel={administrador && !!editando}
+        onFechar={() => setEditando(null)}
+        estiloFundo={styles.modalOverlay}
+        estiloPainel={styles.modalBox}
+        fecharAoTocarFora={false}
+      >
             <ScrollView showsVerticalScrollIndicator={false}>
               <Text style={styles.modalTitle}>Editar ocorrência</Text>
               <Text style={styles.modalLabel}>Descrição atual</Text>
-              <TextInput style={styles.modalInput} multiline value={descricaoEdicao} onChangeText={setDescricaoEdicao} />
+              <TextInput style={styles.modalInput} multiline placeholderTextColor={cores.placeholder} value={descricaoEdicao} onChangeText={setDescricaoEdicao} />
 
               <Text style={styles.modalLabel}>Bairro</Text>
-              <TextInput style={styles.modalNeighborhoodInput} value={bairroEdicao} onChangeText={setBairroEdicao} placeholder="Bairro da ocorrência" />
+              <TextInput style={styles.modalNeighborhoodInput} value={bairroEdicao} onChangeText={setBairroEdicao} placeholder="Bairro da ocorrência" placeholderTextColor={cores.placeholder} />
 
               <Text style={styles.modalLabel}>Gravidade</Text>
               <View style={styles.optionsRow}>
@@ -681,9 +698,7 @@ export default function ListaAlertasScreen() {
                 <TouchableOpacity style={styles.modalSave} onPress={salvarEdicao} disabled={salvandoEdicao}><Text style={styles.modalSaveText}>{salvandoEdicao ? 'Salvando...' : 'Salvar'}</Text></TouchableOpacity>
               </View>
             </ScrollView>
-          </View>
-        </View>
-      </Modal>
+      </ModalDeslizante>
     </ScreenWrapper>
   );
 }

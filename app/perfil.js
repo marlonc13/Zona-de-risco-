@@ -1,52 +1,36 @@
-import { 
-  View, 
-  Text, 
-  TextInput, 
-  TouchableOpacity, 
-  Alert, 
-  Image
-} from 'react-native';
-import ScreenWrapper, { useScrollToSection } from '../components/screen-wrapper';
-import { useState, useEffect } from 'react';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { View, TouchableOpacity, Alert, Image } from 'react-native';
+import { Text, TextInput } from '../components/texto';
+import ScreenWrapper from '../components/screen-wrapper';
+import { useState, useEffect, useRef } from 'react';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import app from '../services/firebaseConfig';
-import { EmailAuthProvider, getAuth, onAuthStateChanged, reauthenticateWithCredential, signOut, updatePassword, updateProfile } from 'firebase/auth';
+import { getAuth, signOut, updateProfile } from 'firebase/auth';
 import { doc, getDoc, getFirestore, serverTimestamp, setDoc } from 'firebase/firestore';
-import styles from '../styles/perfil.styles';
-import { observarStatusAdministrador } from '../services/accessControl';
+import estilosPerfil from '../styles/perfil.styles';
 import { uploadImage } from '../services/imageUpload';
 import CameraCaptura from '../components/camera-captura';
+import ModalDeslizante from '../components/modal-deslizante';
+import { useEstilos, useTema } from '../hooks/use-tema';
 
 const auth = getAuth(app);
 const db = getFirestore(app);
 
 export default function Perfil() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
+  const styles = useEstilos(estilosPerfil);
+  const { cores } = useTema();
 
   const [nome, setNome] = useState('');
   const [email, setEmail] = useState('');
-  const [senhaAtual, setSenhaAtual] = useState('');
-  const [novaSenha, setNovaSenha] = useState('');
-  const [confirmarSenha, setConfirmarSenha] = useState('');
-  const [mostrarSenhas, setMostrarSenhas] = useState(false);
   const [foto, setFoto] = useState(null);
+  const [fotoSalva, setFotoSalva] = useState(null);
   const [salvandoPerfil, setSalvandoPerfil] = useState(false);
-  const [salvandoSenha, setSalvandoSenha] = useState(false);
-  const [administrador, setAdministrador] = useState(false);
   const [cameraVisivel, setCameraVisivel] = useState(false);
-
-  useEffect(() => {
-    let pararAdmin = () => {};
-    const pararAuth = onAuthStateChanged(auth, user => {
-      pararAdmin();
-      pararAdmin = observarStatusAdministrador(user, setAdministrador);
-    });
-    return () => { pararAuth(); pararAdmin(); };
-  }, []);
+  const [opcoesFotoVisiveis, setOpcoesFotoVisiveis] = useState(false);
+  // o que abrir depois que o painel de opções da foto terminar de fechar
+  const acaoFotoPendente = useRef(null);
 
   useEffect(() => {
     const user = auth.currentUser;
@@ -57,10 +41,13 @@ export default function Perfil() {
     setNome(user.displayName || '');
     setEmail(user.email || '');
     setFoto(user.photoURL || null);
+    setFotoSalva(user.photoURL || null);
     getDoc(doc(db, 'usuarios', user.uid))
       .then(snapshot => {
-        if (snapshot.exists() && snapshot.data()?.photoUrl) {
-          setFoto(snapshot.data().photoUrl);
+        const photoUrl = snapshot.exists() ? snapshot.data()?.photoUrl : null;
+        if (photoUrl) {
+          setFoto(photoUrl);
+          setFotoSalva(photoUrl);
         }
       })
       .catch(error => console.warn('Não foi possível carregar a foto:', error));
@@ -81,7 +68,17 @@ export default function Perfil() {
     if (!result.canceled) setFoto(result.assets[0].uri);
   };
 
-  const tirarFoto = () => setCameraVisivel(true);
+  const escolherOpcaoFoto = acao => {
+    acaoFotoPendente.current = acao;
+    setOpcoesFotoVisiveis(false);
+  };
+
+  const abrirAcaoFotoPendente = () => {
+    const acao = acaoFotoPendente.current;
+    acaoFotoPendente.current = null;
+    if (acao === 'camera') setCameraVisivel(true);
+    if (acao === 'galeria') escolherFoto();
+  };
 
   const salvarPerfil = async () => {
     const user = auth.currentUser;
@@ -104,6 +101,7 @@ export default function Perfil() {
         atualizadoEm: serverTimestamp(),
       }, { merge: true });
       setFoto(photoUrl || null);
+      setFotoSalva(photoUrl || null);
       Alert.alert('Sucesso', 'Nome e foto atualizados.');
     } catch (error) {
       console.error('Erro ao atualizar perfil:', error);
@@ -115,138 +113,134 @@ export default function Perfil() {
     }
   };
 
-  const alterarSenha = async () => {
-    const user = auth.currentUser;
-    if (!user) return;
-    if (!senhaAtual || !novaSenha || !confirmarSenha) return Alert.alert('Campos obrigatórios', 'Preencha a senha atual, a nova senha e a confirmação.');
-    if (novaSenha.length < 6) return Alert.alert('Senha fraca', 'A nova senha precisa ter pelo menos 6 caracteres.');
-    if (novaSenha !== confirmarSenha) return Alert.alert('Senhas diferentes', 'A confirmação precisa ser igual à nova senha.');
-
-    try {
-      setSalvandoSenha(true);
-      const credencial = EmailAuthProvider.credential(user.email, senhaAtual);
-      await reauthenticateWithCredential(user, credencial);
-      await updatePassword(user, novaSenha);
-      setSenhaAtual('');
-      setNovaSenha('');
-      setConfirmarSenha('');
-      setMostrarSenhas(false);
-      Alert.alert('Senha alterada', 'Sua senha foi atualizada com sucesso.');
-    } catch (error) {
-      console.error('Erro ao alterar senha:', error);
-      let mensagem = `Não foi possível alterar a senha. Código: ${error.code || 'desconhecido'}.`;
-      if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password') mensagem = 'A senha atual está incorreta.';
-      if (error.code === 'auth/weak-password') mensagem = 'A nova senha precisa ter pelo menos 6 caracteres.';
-      Alert.alert('Erro', mensagem);
-    } finally {
-      setSalvandoSenha(false);
-    }
-  };
-
+  // Volta para a tela inicial (entrar como visitante ou fazer login) e limpa o histórico,
+  // para o botão "voltar" não reabrir telas da conta que acabou de sair
   const sair = async () => {
     await signOut(auth);
-    router.replace('/mapa');
+    if (router.canDismiss()) router.dismissAll();
+    router.replace('/inicio');
   };
 
-  const trocarConta = async () => {
-    await signOut(auth);
-    router.replace('/email-login');
-  };
+  const fotoNaoSalva = foto !== fotoSalva;
 
-  const { scrollRef, onLayout, rolarParaSecao } = useScrollToSection();
+  const OPCOES_MENU = [
+    { icone: 'star', cor: '#f9ab00', rotulo: 'Pessoas e locais favoritos', descricao: 'Acompanhe alertas perto de quem você ama', onPress: () => router.push('/familiares') },
+    { icone: 'settings-sharp', cor: '#5f6368', rotulo: 'Configurações', descricao: 'Tema, letras grandes, senha e residência', onPress: () => router.push('/config') },
+  ];
 
   return (
-    <ScreenWrapper scrollable scrollRef={scrollRef} style={styles.container} includeTop={false}>
-      <View style={{ width: '100%', alignItems: 'center' }}>
-
-        <Text style={styles.title}>Perfil do usuário</Text>
-        
-        <TouchableOpacity onPress={escolherFoto} style={styles.avatar}>
-          {foto ? <Image source={{ uri: foto }} style={styles.avatarImage} /> : <Ionicons name="add" size={32} color="#1a73e8" />}
+    <ScreenWrapper scrollable style={styles.container} includeTop={false} backgroundColor={cores.screen}>
+      {/* Cabeçalho: foto, nome e e-mail */}
+      <View style={styles.headerCard}>
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={() => setOpcoesFotoVisiveis(true)}
+          accessibilityRole="button"
+          accessibilityLabel="Alterar foto de perfil"
+        >
+          <View style={styles.avatar}>
+            {foto
+              ? <Image source={{ uri: foto }} style={styles.avatarImage} />
+              : <Ionicons name="person" size={58} color={cores.tint} />}
+          </View>
+          <View style={styles.avatarBadge}>
+            <Ionicons name="camera" size={16} color={cores.onButton} />
+          </View>
         </TouchableOpacity>
 
-        <View style={styles.photoRow}>
-          <TouchableOpacity style={[styles.secondaryButton, { flexDirection: 'row', alignItems: 'center', gap: 6 }]} onPress={tirarFoto}>
-            <Ionicons name="camera" size={18} color="#1a73e8" />
-            <Text style={styles.secondaryText}>Tirar foto</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.secondaryButton, { flexDirection: 'row', alignItems: 'center', gap: 6 }]} onPress={escolherFoto}>
-            <Ionicons name="images" size={18} color="#1a73e8" />
-            <Text style={styles.secondaryText}>Galeria</Text>
-          </TouchableOpacity>
-        </View>
+        <Text style={styles.name} numberOfLines={2}>{nome.trim() || 'Seu nome'}</Text>
+        <Text style={styles.email} numberOfLines={1}>{email}</Text>
+        {fotoNaoSalva && <Text style={styles.unsavedHint}>Toque em “Salvar alterações” para manter a nova foto.</Text>}
+      </View>
 
-        <TextInput style={styles.input} placeholder="Nome" value={nome} onChangeText={setNome} />
-        <TextInput style={[styles.input, styles.disabled]} placeholder="Email" value={email} editable={false} />
-        
-        <Text style={{ color: administrador ? '#d93025' : '#5f6368', fontWeight: '800', marginBottom: 12 }}>
-          Perfil: {administrador ? 'Administrador' : 'Usuário'}
-        </Text>
-        
-        <TouchableOpacity style={styles.button} onPress={salvarPerfil} disabled={salvandoPerfil}>
-          <Text style={styles.buttonText}>{salvandoPerfil ? 'Salvando perfil...' : 'Salvar nome e foto'}</Text>
-        </TouchableOpacity>
-
-        <Text style={styles.passwordTitle} onLayout={onLayout}>
-          Alterar senha (opcional)
-        </Text>
-        
-        <View style={styles.passwordBox}>
+      {/* Dados da conta */}
+      <Text style={styles.sectionTitle}>Dados da conta</Text>
+      <View style={styles.card}>
+        <Text style={styles.label}>Nome</Text>
+        <View style={styles.inputRow}>
+          <Ionicons name="person-outline" size={18} color={cores.textMuted} />
           <TextInput
-            style={styles.passwordInput}
-            placeholder="Senha atual"
-            secureTextEntry={!mostrarSenhas}
-            value={senhaAtual}
-            onChangeText={setSenhaAtual}
-            onFocus={() => rolarParaSecao()}
+            style={styles.input}
+            placeholder="Como você quer ser chamado"
+            placeholderTextColor={cores.placeholder}
+            value={nome}
+            onChangeText={setNome}
           />
-          <TouchableOpacity style={styles.eyeButton} onPress={() => setMostrarSenhas(atual => !atual)}>
-            <Ionicons name={mostrarSenhas ? 'eye-off' : 'eye'} size={20} color="#5f6368" />
-          </TouchableOpacity>
         </View>
 
-        <TextInput
-          style={styles.input}
-          placeholder="Nova senha"
-          secureTextEntry={!mostrarSenhas}
-          value={novaSenha}
-          onChangeText={setNovaSenha}
-          onFocus={() => rolarParaSecao()}
-        />
+        <Text style={[styles.label, styles.labelSpacing]}>E-mail</Text>
+        <View style={[styles.inputRow, styles.inputRowDisabled]}>
+          <Ionicons name="mail-outline" size={18} color={cores.textMuted} />
+          <TextInput style={[styles.input, styles.inputDisabled]} value={email} editable={false} />
+          <Ionicons name="lock-closed" size={14} color={cores.textFaint} />
+        </View>
 
-        <TextInput
-          style={styles.input}
-          placeholder="Confirmar nova senha"
-          secureTextEntry={!mostrarSenhas}
-          value={confirmarSenha}
-          onChangeText={setConfirmarSenha}
-          onFocus={() => rolarParaSecao()}
-        />
-
-        <TouchableOpacity style={styles.passwordButton} onPress={alterarSenha} disabled={salvandoSenha}>
-          <Text style={styles.passwordButtonText}>{salvandoSenha ? 'Alterando senha...' : 'Alterar senha'}</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={[styles.secondaryButton, { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }]} onPress={() => router.push('/endereco')}>
-          <Ionicons name="home" size={18} color="#1a73e8" />
-          <Text style={styles.secondaryText}>Adicionar ou mudar endereço</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={[styles.secondaryButton, { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }]} onPress={() => router.push('/familiares')}>
-          <Ionicons name="star" size={18} color="#1a73e8" />
-          <Text style={styles.secondaryText}>Acompanhar endereço de pessoas</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={[styles.switchAccountButton, { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }]} onPress={trocarConta}>
-          <MaterialCommunityIcons name="swap-horizontal" size={18} color="#d93025" />
-          <Text style={styles.switchAccountText}>Trocar de conta</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={[styles.logoutButton, { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }]} onPress={sair}>
-          <Ionicons name="log-out-outline" size={18} color="#fff" />
-          <Text style={styles.logoutText}>Sair da conta</Text>
+        <TouchableOpacity
+          style={[styles.saveButton, salvandoPerfil && styles.disabledButton]}
+          onPress={salvarPerfil}
+          disabled={salvandoPerfil}
+        >
+          <Text style={styles.saveButtonText}>{salvandoPerfil ? 'Salvando...' : 'Salvar alterações'}</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Atalhos */}
+      <Text style={styles.sectionTitle}>Mais opções</Text>
+      <View style={[styles.card, styles.menuCard]}>
+        {OPCOES_MENU.map((opcao, indice) => (
+          <TouchableOpacity
+            key={opcao.rotulo}
+            activeOpacity={0.7}
+            style={[styles.menuRow, indice > 0 && styles.menuRowDivider]}
+            onPress={opcao.onPress}
+          >
+            <View style={[styles.menuIcon, { backgroundColor: opcao.cor }]}>
+              <Ionicons name={opcao.icone} size={18} color="#fff" />
+            </View>
+            <View style={styles.menuTextArea}>
+              <Text style={styles.menuLabel}>{opcao.rotulo}</Text>
+              <Text style={styles.menuDescription}>{opcao.descricao}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={cores.textFaint} />
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      <TouchableOpacity style={styles.logoutButton} onPress={sair}>
+        <Ionicons name="log-out-outline" size={20} color={cores.danger} />
+        <Text style={styles.logoutText}>Sair da conta</Text>
+      </TouchableOpacity>
+
+      {/* Opções ao tocar na foto */}
+      <ModalDeslizante
+        visivel={opcoesFotoVisiveis}
+        onFechar={() => setOpcoesFotoVisiveis(false)}
+        aoTerminarDeFechar={abrirAcaoFotoPendente}
+        estiloFundo={styles.sheetOverlay}
+        estiloPainel={styles.sheet}
+      >
+        <View style={styles.sheetHandle} />
+        <Text style={styles.sheetTitle}>Foto de perfil</Text>
+
+        <TouchableOpacity style={styles.sheetOption} onPress={() => escolherOpcaoFoto('camera')}>
+          <View style={[styles.sheetOptionIcon, { backgroundColor: cores.tintBackground }]}>
+            <Ionicons name="camera" size={22} color={cores.tint} />
+          </View>
+          <Text style={styles.sheetOptionText}>Tirar foto</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.sheetOption} onPress={() => escolherOpcaoFoto('galeria')}>
+          <View style={[styles.sheetOptionIcon, { backgroundColor: cores.tintBackground }]}>
+            <Ionicons name="images" size={22} color={cores.tint} />
+          </View>
+          <Text style={styles.sheetOptionText}>Galeria</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.sheetCancel} onPress={() => setOpcoesFotoVisiveis(false)}>
+          <Text style={styles.sheetCancelText}>Cancelar</Text>
+        </TouchableOpacity>
+      </ModalDeslizante>
+
       <CameraCaptura
         visivel={cameraVisivel}
         cameraInicial="front"

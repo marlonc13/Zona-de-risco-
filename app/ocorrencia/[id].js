@@ -1,4 +1,6 @@
-import { ActivityIndicator, Image, Linking, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, Linking, ScrollView, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Text } from '../../components/texto';
 import { useEffect, useState, useMemo } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Mapbox from '@rnmapbox/maps';
@@ -7,9 +9,10 @@ import { onAuthStateChanged } from 'firebase/auth';
 import app, { auth } from '../../services/firebaseConfig';
 import { observarStatusAdministrador } from '../../services/accessControl';
 import { dadosGravidade, formatarRaio, orientacaoDoRisco } from '../../services/riskGuidance';
-import styles from '../../styles/ocorrencia.styles';
+import estilosOcorrencia from '../../styles/ocorrencia.styles';
 import { STATUS_ALERTA, dadosStatus, statusEfetivo } from '../../services/alertLifecycle';
 import { compartilharAlertaWhatsApp } from '../../services/shareAlert';
+import { useEstilos, useTema } from '../../hooks/use-tema';
 
 const db = getFirestore(app);
 
@@ -51,6 +54,9 @@ function gerarCirculoGeoJSON(centroLong, centroLat, raioMetros, id, corHex) {
 export default function OcorrenciaDetalhes() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
+  const styles = useEstilos(estilosOcorrencia);
+  const insets = useSafeAreaInsets();
+  const { cores } = useTema();
   const [ocorrencia, setOcorrencia] = useState(null);
   const [carregando, setCarregando] = useState(true);
   const [administrador, setAdministrador] = useState(false);
@@ -83,7 +89,7 @@ export default function OcorrenciaDetalhes() {
     return gerarCirculoGeoJSON(longitude, latitude, raioMetros || 1000, 'area-risco', dadosGravidade(gravidade).cor);
   }, [ocorrencia]);
 
-  if (carregando) return <View style={styles.center}><ActivityIndicator size="large" color="#1a73e8" /></View>;
+  if (carregando) return <View style={styles.center}><ActivityIndicator size="large" color={cores.tint} /></View>;
 
   if (!ocorrencia) return <View style={styles.center}><Text style={styles.notFound}>Esta ocorrência não foi encontrada ou foi excluída.</Text><TouchableOpacity style={styles.backButton} onPress={() => router.back()}><Text style={styles.backButtonText}>Voltar</Text></TouchableOpacity></View>;
 
@@ -97,11 +103,11 @@ export default function OcorrenciaDetalhes() {
   const abrirRota = () => Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${coordenada.latitude},${coordenada.longitude}`);
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.topBar}>
-        <TouchableOpacity style={styles.iconButton} onPress={() => router.back()}><Text style={styles.iconButtonText}>‹</Text></TouchableOpacity>
+    <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: 40 + insets.bottom }]}>
+      <View style={[styles.topBar, { paddingTop: Math.max(48, insets.top + 12) }]}>
+        <TouchableOpacity style={styles.iconButton} onPress={() => router.back()}><Text escalavel={false} style={styles.iconButtonText}>‹</Text></TouchableOpacity>
         <Text style={styles.topTitle}>Detalhes da ocorrência</Text>
-        <TouchableOpacity accessibilityLabel="Compartilhar alerta pelo WhatsApp" style={[styles.iconButton, styles.shareIconButton]} onPress={() => compartilharAlertaWhatsApp(ocorrencia)}><Text style={styles.shareIconText}>↗</Text></TouchableOpacity>
+        <TouchableOpacity accessibilityLabel="Compartilhar alerta pelo WhatsApp" style={[styles.iconButton, styles.shareIconButton]} onPress={() => compartilharAlertaWhatsApp(ocorrencia)}><Text escalavel={false} style={styles.shareIconText}>↗</Text></TouchableOpacity>
       </View>
 
       {ocorrencia.fotoUrl ? <Image source={{ uri: ocorrencia.fotoUrl }} style={styles.heroImage} /> : <View style={styles.heroPlaceholder}><Text style={styles.heroEmoji}>{EMOJIS[ocorrencia.tipo] || '📍'}</Text><Text style={styles.heroPlaceholderText}>Sem foto anexada</Text></View>}
@@ -123,7 +129,7 @@ export default function OcorrenciaDetalhes() {
           const atual = item.id === statusAtual;
           const concluido = indice < indiceStatus;
           return <View key={item.id} style={styles.lifecycleItem}>
-            <View style={[styles.lifecycleDot, { backgroundColor: atual || concluido ? item.cor : '#dadce0' }]}><Text style={styles.lifecycleDotText}>{concluido ? '✓' : item.emoji}</Text></View>
+            <View style={[styles.lifecycleDot, { backgroundColor: atual || concluido ? item.cor : cores.border }]}><Text escalavel={false} style={styles.lifecycleDotText}>{concluido ? '✓' : item.emoji}</Text></View>
             <View style={{ flex: 1 }}><Text style={[styles.lifecycleLabel, atual && { color: item.cor }]}>{item.label}</Text>{atual && <Text style={styles.lifecycleCurrent}>Estado atual</Text>}</View>
           </View>;
         })}

@@ -1,8 +1,11 @@
 import React from 'react';
-import { View, Text } from 'react-native';
-import styles from '../../styles/explore.styles';
+import { View } from 'react-native';
+import { Text } from '../../components/texto';
+import estilosExplore from '../../styles/explore.styles';
+import { useEstilos } from '../../hooks/use-tema';
 
 export default function Explore() {
+  const styles = useEstilos(estilosExplore);
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Alertas</Text>

@@ -25,8 +25,7 @@ module.exports = {
         "android.permission.RECORD_AUDIO"
       ],
       adaptiveIcon: {
-        foregroundImage: "./assets/images/splash-icon.png",
-        backgroundColor: "#E6F4FE"
+        foregroundImage: "./assets/images/splash-icon.png"
       },
       predictiveBackGestureEnabled: false
     },

@@ -1,15 +1,21 @@
 import { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ImageBackground, Alert, ActivityIndicator, KeyboardAvoidingView, ScrollView, Platform, Image } from 'react-native';
+import { View, TouchableOpacity, ImageBackground, Alert, ActivityIndicator, KeyboardAvoidingView, ScrollView, Platform, Image } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Text, TextInput } from '../components/texto';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, signOut } from 'firebase/auth';
 import { auth } from '../services/firebaseConfig';
 import { authenticateWithBiometrics } from '../services/biometricAuth';
-import styles from '../styles/email-login.styles';
+import estilosEmailLogin, { locais } from '../styles/email-login.styles';
+import { useEstilos, useTema } from '../hooks/use-tema';
 import { verificarAdministrador } from '../services/accessControl';
 
 export default function EmailLogin() {
   const router = useRouter();
+  const styles = useEstilos(estilosEmailLogin);
+  const insets = useSafeAreaInsets();
+  const { tema, cores } = useTema();
   const [modoCadastro, setModoCadastro] = useState(false);
   const [nome, setNome] = useState('');
   const [email, setEmail] = useState('');
@@ -146,18 +152,19 @@ const entrarNoApp = async (user) => {
 
   return (
     <ImageBackground source={require('../assets/images/fundoentrada.png')} style={styles.container} resizeMode="cover" blurRadius={1}>
+      {/* Véu sobre a imagem: fica fora do ScrollView para cobrir a tela inteira */}
+      <View style={styles.overlay}>
       <KeyboardAvoidingView 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
         style={{ flex: 1 }}
       >
         <ScrollView 
-          contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: 20 }}
+          contentContainerStyle={[styles.content, { paddingTop: Math.max(40, insets.top + 16), paddingBottom: 40 + insets.bottom }]}
           keyboardShouldPersistTaps="handled"
         >
-          <View style={styles.overlay}>
             <View style={styles.logo}>
               <Image 
-                source={require('../assets/images/icon.png')} 
+                source={require('../assets/images/splash-icon.png')} 
                 style={styles.logoImagem} 
                 resizeMode="contain"
               />
@@ -170,7 +177,7 @@ const entrarNoApp = async (user) => {
               <TextInput
                 style={styles.input}
                 placeholder="Nome"
-                placeholderTextColor="#777"
+                placeholderTextColor={locais[tema].placeholder}
                 value={nome}
                 onChangeText={setNome}
                 autoCapitalize="words"
@@ -180,7 +187,7 @@ const entrarNoApp = async (user) => {
             <TextInput
               style={styles.input}
               placeholder="E-mail"
-              placeholderTextColor="#777"
+              placeholderTextColor={locais[tema].placeholder}
               value={email}
               onChangeText={setEmail}
               autoCapitalize="none"
@@ -191,7 +198,7 @@ const entrarNoApp = async (user) => {
               <TextInput
                 style={styles.passwordInput}
                 placeholder="Senha"
-                placeholderTextColor="#777"
+                placeholderTextColor={locais[tema].placeholder}
                 value={senha}
                 onChangeText={setSenha}
                 secureTextEntry={!mostrarSenha}
@@ -202,7 +209,7 @@ const entrarNoApp = async (user) => {
             </View>
 
             <TouchableOpacity style={styles.button} onPress={enviar} disabled={carregando}>
-              {carregando ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>{modoCadastro ? 'Criar e entrar' : 'Entrar com senha'}</Text>}
+              {carregando ? <ActivityIndicator color={cores.onButton} /> : <Text style={styles.buttonText}>{modoCadastro ? 'Criar e entrar' : 'Entrar com senha'}</Text>}
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.linkButton} onPress={() => setModoCadastro(!modoCadastro)} disabled={carregando}>
@@ -212,9 +219,9 @@ const entrarNoApp = async (user) => {
             <TouchableOpacity style={styles.voltarButton} onPress={() => router.replace('/inicio')} disabled={carregando}>
               <Text style={styles.voltarText}>Voltar</Text>
             </TouchableOpacity>
-          </View>
         </ScrollView>
       </KeyboardAvoidingView>
+      </View>
     </ImageBackground>
   );
 }

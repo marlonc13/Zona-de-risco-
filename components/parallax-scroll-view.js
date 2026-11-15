@@ -7,7 +7,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { ThemedView } from './themed-view';
-import { useColorScheme } from '../hooks/use-color-scheme';
+import { useTema } from '../hooks/use-tema';
 import { useThemeColor } from '../hooks/use-theme-color';
 import styles from './parallax-scroll-view.styles';
 
@@ -19,7 +19,7 @@ export default function ParallaxScrollView({
   headerBackgroundColor,
 }) {
   const backgroundColor = useThemeColor({}, 'background');
-  const colorScheme = useColorScheme() ?? 'light';
+  const { tema: colorScheme } = useTema();
 
   const scrollRef = useAnimatedRef();
   const scrollOffset = useScrollOffset(scrollRef);

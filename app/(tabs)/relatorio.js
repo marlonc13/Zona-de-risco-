@@ -1,4 +1,5 @@
-import { ActivityIndicator, Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, TouchableOpacity, View } from 'react-native';
+import { Text } from '../../components/texto';
 import { useEffect, useMemo, useState } from 'react';
 import { collection, getFirestore, onSnapshot } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -7,7 +8,8 @@ import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import app, { auth } from '../../services/firebaseConfig';
 import { observarStatusAdministrador } from '../../services/accessControl';
-import styles from '../../styles/relatorio.styles';
+import estilosRelatorio from '../../styles/relatorio.styles';
+import { useEstilos, useTema } from '../../hooks/use-tema';
 import { STATUS_ALERTA, dadosStatus, statusEfetivo } from '../../services/alertLifecycle';
 
 const db = getFirestore(app);
@@ -31,6 +33,8 @@ function contarPor(lista, campo, valores) {
 
 export default function RelatorioScreen() {
   const router = useRouter();
+  const styles = useEstilos(estilosRelatorio);
+  const { cores } = useTema();
   const [alertas, setAlertas] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [exportando, setExportando] = useState(false);
@@ -118,7 +122,7 @@ export default function RelatorioScreen() {
     }
   };
 
-  if (carregando) return <View style={styles.center}><ActivityIndicator size="large" color="#1a73e8" /></View>;
+  if (carregando) return <View style={styles.center}><ActivityIndicator size="large" color={cores.tint} /></View>;
 
   const maiorTipo = Math.max(1, ...dados.tipos.map(item => item.total));
 
@@ -129,9 +133,9 @@ export default function RelatorioScreen() {
       <Text style={styles.subtitle}>Resumo de todo o histórico registrado no sistema</Text>
 
       <View style={styles.summaryRow}>
-        <View style={styles.summaryCard}><Text style={styles.summaryNumber}>{dados.total}</Text><Text style={styles.summaryLabel}>Total</Text></View>
-        <View style={styles.summaryCard}><Text style={[styles.summaryNumber, { color: '#137333' }]}>{dados.ativos}</Text><Text style={styles.summaryLabel}>Ativos</Text></View>
-        <View style={styles.summaryCard}><Text style={[styles.summaryNumber, { color: '#5f6368' }]}>{dados.encerrados}</Text><Text style={styles.summaryLabel}>Encerrados</Text></View>
+        <View style={styles.summaryCard}><Text style={styles.summaryNumber}>{dados.total}</Text><Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={styles.summaryLabel}>Total</Text></View>
+        <View style={styles.summaryCard}><Text style={[styles.summaryNumber, { color: cores.success }]}>{dados.ativos}</Text><Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={styles.summaryLabel}>Ativos</Text></View>
+        <View style={styles.summaryCard}><Text style={[styles.summaryNumber, { color: cores.textMuted }]}>{dados.encerrados}</Text><Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={styles.summaryLabel}>Encerrados</Text></View>
       </View>
 
       <View style={styles.section}>

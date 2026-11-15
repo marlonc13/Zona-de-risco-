@@ -1,14 +1,20 @@
-import { Text, TextInput, TouchableOpacity, Alert, StyleSheet, ScrollView } from 'react-native';
+import { TouchableOpacity, Alert, ScrollView } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Text, TextInput } from '../components/texto';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
 import * as Location from 'expo-location';
 import { doc, getDoc, getFirestore, setDoc } from 'firebase/firestore';
 import app, { auth } from '../services/firebaseConfig';
+import { criarEstilos, useEstilos, useTema } from '../hooks/use-tema';
 
 const db = getFirestore(app);
 
 export default function Endereco() {
   const router = useRouter();
+  const styles = useEstilos(estilos);
+  const insets = useSafeAreaInsets();
+  const { cores } = useTema();
   const [endereco, setEndereco] = useState('');
   const [numero, setNumero] = useState('');
   const [bairro, setBairro] = useState('');
@@ -61,27 +67,28 @@ export default function Endereco() {
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <ScrollView contentContainerStyle={[styles.container, { paddingBottom: 26 + insets.bottom }]}>
       <Text style={styles.title}>Minha residência</Text>
       <Text style={styles.subtitle}>Cadastre ou altere o endereço da sua casa.</Text>
       <TouchableOpacity style={styles.locationButton} onPress={usarLocalizacao}><Text style={styles.locationText}>📍 Usar minha localização atual</Text></TouchableOpacity>
-      <TextInput style={styles.input} placeholder="Rua / Avenida" value={endereco} onChangeText={setEndereco} />
-      <TextInput style={styles.input} placeholder="Número" value={numero} onChangeText={setNumero} keyboardType="numeric" />
-      <TextInput style={styles.input} placeholder="Bairro" value={bairro} onChangeText={setBairro} />
-      <TextInput style={styles.input} placeholder="Cidade" value={cidade} onChangeText={setCidade} />
-      <TextInput style={styles.input} placeholder="Estado" value={estado} onChangeText={setEstado} />
+      <TextInput style={styles.input} placeholder="Rua / Avenida" placeholderTextColor={cores.placeholder} value={endereco} onChangeText={setEndereco} />
+      <TextInput style={styles.input} placeholder="Número" placeholderTextColor={cores.placeholder} value={numero} onChangeText={setNumero} keyboardType="numeric" />
+      <TextInput style={styles.input} placeholder="Bairro" placeholderTextColor={cores.placeholder} value={bairro} onChangeText={setBairro} />
+      <TextInput style={styles.input} placeholder="Cidade" placeholderTextColor={cores.placeholder} value={cidade} onChangeText={setCidade} />
+      <TextInput style={styles.input} placeholder="Estado" placeholderTextColor={cores.placeholder} value={estado} onChangeText={setEstado} />
       <TouchableOpacity style={styles.save} onPress={salvar} disabled={salvando}><Text style={styles.saveText}>{salvando ? 'Salvando...' : 'Salvar endereço'}</Text></TouchableOpacity>
     </ScrollView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flexGrow: 1, backgroundColor: '#f5f7fb', padding: 26, justifyContent: 'center' },
-  title: { fontSize: 28, fontWeight: '900', color: '#202124' },
-  subtitle: { color: '#5f6368', marginTop: 6, marginBottom: 20 },
-  locationButton: { backgroundColor: '#e8f0fe', padding: 15, borderRadius: 14, marginBottom: 16 },
-  locationText: { color: '#1a73e8', fontWeight: '800', textAlign: 'center' },
-  input: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#dadce0', borderRadius: 13, padding: 14, marginBottom: 12 },
-  save: { backgroundColor: '#1a73e8', borderRadius: 14, padding: 16, marginTop: 6 },
-  saveText: { color: '#fff', textAlign: 'center', fontWeight: '900', fontSize: 16 },
-});
+const estilos = criarEstilos((c, tema) => ({
+  container: { flexGrow: 1, backgroundColor: c.screen, padding: 26, justifyContent: 'center' },
+  title: { fontSize: 28, fontWeight: '900', color: c.textStrong },
+  subtitle: { color: c.textMuted, marginTop: 6, marginBottom: 20 },
+  locationButton: { backgroundColor: c.tintBackground, padding: 15, borderRadius: 14, marginBottom: 16 },
+  locationText: { color: c.tint, fontWeight: '800', textAlign: 'center' },
+  // no claro mantém a cor de texto padrão do sistema
+  input: { backgroundColor: c.surface, borderWidth: 1, borderColor: c.border, borderRadius: 13, padding: 14, marginBottom: 12, ...(tema === 'dark' ? { color: c.textStrong } : {}) },
+  save: { backgroundColor: c.button, borderRadius: 14, padding: 16, marginTop: 6 },
+  saveText: { color: c.onButton, textAlign: 'center', fontWeight: '900', fontSize: 16 },
+}));

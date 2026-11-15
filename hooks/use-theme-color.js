@@ -1,13 +1,14 @@
 import { Colors } from '../constants/theme';
-import { useColorScheme } from './use-color-scheme';
+import { useTema } from './use-tema';
 
+// Segue o tema escolhido no app (e não só o do aparelho)
 export function useThemeColor(props, colorName) {
-  const theme = useColorScheme() ?? 'light';
-  const colorFromProps = props[theme];
+  const { tema } = useTema();
+  const colorFromProps = props[tema];
 
   if (colorFromProps) {
     return colorFromProps;
   } else {
-    return Colors[theme][colorName];
+    return Colors[tema][colorName];
   }
 }

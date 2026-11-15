@@ -1,13 +1,18 @@
 import { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, ImageBackground, Image, ActivityIndicator } from 'react-native';
+import { View, TouchableOpacity, ImageBackground, Image, ActivityIndicator } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Text } from '../components/texto';
 import { useRouter } from 'expo-router';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../services/firebaseConfig';
 import { verificarAdministrador } from '../services/accessControl';
-import styles from '../styles/inicio.styles';
+import estilosInicio from '../styles/inicio.styles';
+import { useEstilos } from '../hooks/use-tema';
 
 export default function Inicio() {
   const router = useRouter();
+  const styles = useEstilos(estilosInicio);
+  const insets = useSafeAreaInsets();
   const [verificando, setVerificando] = useState(true)
 
   useEffect(() => {
@@ -50,10 +55,10 @@ export default function Inicio() {
         resizeMode="cover" 
         blurRadius={1}
       >
-        <View style={styles.overlay}>
+        <View style={[styles.overlay, { paddingTop: 28 + insets.top, paddingBottom: 28 + insets.bottom }]}>
           <View style={styles.logo}>
             <Image 
-              source={require('../assets/images/icon.png')} 
+              source={require('../assets/images/splash-icon.png')} 
               style={styles.logoImagem} 
               resizeMode="contain"
             />

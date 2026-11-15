@@ -1,4 +1,4 @@
-import { Text } from 'react-native';
+import { Text } from './texto';
 
 import { useThemeColor } from '../hooks/use-theme-color';
 import styles from './themed-text.styles';
