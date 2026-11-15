@@ -16,11 +16,13 @@ Aplicativo mobile desenvolvido com **React Native (Expo)** que alerta pessoas pr
 - [Mapbox](https://www.mapbox.com/) para mapas
 - [Firebase](https://firebase.google.com/): Authentication e Firestore (banco de dados)
 - [Open-Meteo](https://open-meteo.com/) para condições meteorológicas (sem chave de API)
+- [OpenStreetMap / Nominatim](https://nominatim.org/) para a pesquisa de endereços (abrigos e pessoas acompanhadas)
+- [Jest](https://jestjs.io/) com `jest-expo` para os testes automatizados
 
 ## Perfis do sistema
 
 - **Visitante:** consulta o mapa, o histórico de alertas e recebe avisos próximos enquanto usa o aplicativo.
-- **Usuário cadastrado:** além do que o visitante faz, mantém o perfil e cadastra/altera a residência.
+- **Usuário cadastrado:** além do que o visitante faz, mantém o perfil, cadastra/altera a residência e acompanha até 5 pessoas ou locais favoritos.
 - **Administrador:** acessa o painel administrativo, publica ocorrências, gerencia pontos seguros e visualiza relatórios.
 
 O administrador inicial é `alinelasneau@gmail.com`. Novos administradores podem ser cadastrados pela administradora principal usando o e-mail da conta.
@@ -37,6 +39,33 @@ O administrador inicial é `alinelasneau@gmail.com`. Novos administradores podem
 - Selo de alerta oficial com datas de publicação e atualização.
 - Condições meteorológicas atuais (Open-Meteo). As informações são apenas auxiliares: nenhuma ocorrência é publicada automaticamente.
 - Histórico de alertas público. Rascunhos ficam visíveis somente para administradores.
+- Compartilhamento de alertas pelo **WhatsApp**, a partir do mapa ou da tela de detalhes.
+- Ao abrir, o mapa já começa na última localização conhecida do usuário (ou mostrando o Brasil, se ainda não houver nenhuma).
+
+### Ciclo de vida das ocorrências
+
+Cada ocorrência passa pelas situações abaixo. Somente as **ativas** e **em monitoramento** aparecem no mapa.
+
+| Situação | O que significa |
+|---|---|
+| Rascunho | Salva pelo administrador, mas ainda não publicada (não aparece para os usuários) |
+| Ativa | Risco confirmado e publicado no mapa |
+| Em monitoramento | Continua visível enquanto é acompanhada |
+| Controlada | Risco contido e retirado do mapa |
+| Encerrada | Atendimento concluído e arquivado |
+
+Alertas ativos ou em monitoramento são **encerrados automaticamente** quando chega a data de expiração definida na publicação.
+
+### Estatísticas públicas
+
+- Aba disponível para todos, sem dados pessoais: totais de ocorrências, alertas ativos, emergências e ocorrências dos últimos 30 dias.
+- Mapa de calor histórico e gráficos por período, situação, tipo, gravidade e bairro.
+
+### Pessoas e locais favoritos
+
+- Acompanhamento de até **5 endereços** de pessoas ou locais importantes (visível somente para o próprio usuário).
+- Cada endereço recebe uma cor de marcador, e a tela mostra quais alertas ativos atingem cada um.
+- Os endereços também entram nos avisos de alertas próximos e no modo de emergência.
 
 ### Pontos seguros e abrigos
 
@@ -48,9 +77,10 @@ O administrador inicial é `alinelasneau@gmail.com`. Novos administradores podem
 
 ### Modo de emergência
 
-- Ativado por alerta vermelho dentro da área do usuário ou da residência.
+- Ativado por alerta de **Emergência** cuja área alcance a localização do usuário, a residência ou um endereço acompanhado.
 - Instruções de evacuação e checklist disponíveis **offline**.
 - Ligações rápidas para Defesa Civil (**199**), Bombeiros (**193**) e SAMU (**192**).
+- Botão **SOS** no topo do mapa, sempre disponível, com ligação para Bombeiros (**193**), Defesa Civil (**199**) e Polícia (**190**).
 
 ### Painel administrativo
 
@@ -63,9 +93,15 @@ O administrador inicial é `alinelasneau@gmail.com`. Novos administradores podem
 
 ### Conta e perfil
 
-- Login com e-mail e senha.
-- Troca de senha com confirmação da senha atual e opção de visualizar os campos.
-- Foto de perfil e nome salvos no documento `usuarios/{uid}`.
+- Login com e-mail e senha, com opção de proteger as próximas entradas com a **biometria** do celular.
+- Foto de perfil (câmera ou galeria, ao tocar na foto) e nome salvos no documento `usuarios/{uid}`.
+- Em **Configurações**: cadastro da residência, troca de senha (com confirmação da senha atual) e exclusão da conta.
+- **Sair da conta** volta para a tela inicial, onde é possível entrar como visitante ou fazer login.
+
+### Aparência e acessibilidade
+
+- Tema **claro**, **escuro** ou **igual ao do sistema**, aplicado a todas as telas e aos mapas.
+- Opção **Letras grandes**, que aumenta em 30% o texto de todas as telas.
 
 ## Como executar
 
@@ -73,7 +109,7 @@ O administrador inicial é `alinelasneau@gmail.com`. Novos administradores podem
 
 ### Requisitos
 
-- [Node.js 20 LTS](https://nodejs.org/)
+- [Node.js](https://nodejs.org/) 20.19 ou mais recente (recomendado: 24 LTS, a mesma versão usada nos testes do GitHub)
 - Computador e celular na mesma rede Wi-Fi
 - Conta no [Mapbox](https://www.mapbox.com/) para gerar os tokens
 - Projeto no [Firebase](https://console.firebase.google.com/)
@@ -90,7 +126,14 @@ O administrador inicial é `alinelasneau@gmail.com`. Novos administradores podem
 
    > No Windows (PowerShell): `Copy-Item .env.example .env`
 
-   O `.env.example` lista todas as chaves necessárias. **Nunca publique o seu `.env`.**
+   O `.env.example` lista todas as chaves necessárias:
+
+   | Variável | Para que serve |
+   |---|---|
+   | `EXPO_PUBLIC_MAPBOX_TOKEN` | Token público do Mapbox (`pk.`), usado pelo app para exibir o mapa |
+   | `MAPBOX_SECRET_TOKEN` | Token secreto do Mapbox (`sk.`), usado só durante o build para baixar o SDK nativo |
+
+   **Nunca publique o seu `.env`.** Ele já está no `.gitignore`.
 
 3. Instale as dependências:
 
@@ -176,13 +219,14 @@ Para exibir pontos seguros no mapa, cadastre documentos na coleção `abrigos` c
 
 ### Fotos
 
-As fotos (perfil, ocorrências e abrigos) são convertidas para **Base64** por `services/imageUpload.js` e salvas diretamente no Firestore. O limite por arquivo é de **600 KiB**, para manter o documento abaixo do limite do Firestore.
+As fotos (perfil, ocorrências e abrigos) são convertidas para **Base64** por `services/imageUpload.js` e salvas diretamente no Firestore, sem usar o Firebase Storage. O limite por arquivo é de **300 KiB**, para manter o documento abaixo do limite do Firestore. Por isso as fotos são comprimidas ao serem escolhidas ou tiradas.
 
 ## Localização e notificações
 
 O aplicativo atualiza a localização a cada ~60 segundos ou após deslocamento de 50 metros, enquanto está aberto. Quando a localização atual ou a residência cadastrada estiver dentro da área de um alerta, o mapa exibe um aviso.
 
-- Um alerta cuja área alcance a localização atual ou a residência gera uma notificação local, uma única vez por alerta.
+- Um alerta cuja área alcance a localização atual, a residência ou um endereço acompanhado gera uma notificação local, uma única vez por alerta.
+- A última localização é guardada no aparelho para o mapa abrir direto no lugar certo na próxima vez.
 - Monitoramento com o aplicativo totalmente fechado exige permissão de localização em segundo plano.
 
 ## Verificações do projeto
@@ -198,6 +242,26 @@ npx expo-doctor
 Os testes ficam em `__tests__/` e cobrem as regras principais do app: ciclo de vida das ocorrências (o que aparece no mapa), controle de administradores, avisos de alertas próximos, orientações de risco e a opção "Letras grandes". Eles não usam o Firebase real nem precisam de celular.
 
 No GitHub, o workflow **Testes** (`.github/workflows/testes.yml`) roda `npm test` em todo push e em todo pull request para a `main`. A `main` é protegida: as alterações entram por pull request e o merge só é liberado quando os testes passam.
+
+## Estrutura do projeto
+
+| Pasta | Conteúdo |
+|---|---|
+| `app/` | Telas e rotas ([Expo Router](https://docs.expo.dev/router/introduction/)); as abas ficam em `app/(tabs)/` |
+| `components/` | Componentes reutilizáveis (textos com "Letras grandes", modal deslizante, câmera, etc.) |
+| `contexts/` | Estados globais: tema e tamanho das letras |
+| `hooks/` | Hooks de tema e estilos (`useTema`, `useEstilos`) |
+| `services/` | Regras e integrações: Firebase, ciclo de vida dos alertas, administradores, notificações, clima, endereços |
+| `styles/` | Estilos de cada tela, com versões para o tema claro e o escuro |
+| `constants/` | Cores dos temas |
+| `__tests__/` | Testes automatizados |
+
+## Como contribuir
+
+1. Crie uma branch a partir da `main` (ex.: `feat/nome-da-melhoria` ou `fix/nome-do-problema`).
+2. Faça as alterações e rode `npm test` e `npm run lint` antes de enviar.
+3. Envie a branch e abra um **pull request** para a `main`.
+4. O merge é liberado depois que o check **Testes automatizados** passar e o pull request for aprovado.
 
 ## Observações importantes
 
