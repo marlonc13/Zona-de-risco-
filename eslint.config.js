@@ -10,7 +10,7 @@ module.exports = defineConfig([
   },
   {
     // variáveis globais do Jest (describe, it, expect, jest...) nos testes
-    files: ['__tests__/**/*.js'],
+    files: ['__tests__/**/*.js', 'jest.setup.js'],
     languageOptions: { globals: globals.jest },
   },
   {

@@ -640,8 +640,8 @@ export default function MapScreen() {
       >
         <TouchableOpacity style={styles.avatar} onPress={abrirPerfil}><Text style={styles.avatarText}>{iniciais}</Text></TouchableOpacity>
         <View style={{ flex: 1 }}><Text style={styles.searchTitle}>Zona de Risco</Text><Text style={styles.searchSub}>{administrador ? 'Modo administrador' : 'Alertas naturais próximos'}</Text></View>
-        <TouchableOpacity style={styles.sosHeaderButton} onPress={() => setModalContatosVisivel(true)}><Text style={styles.sosHeaderText}>SOS</Text></TouchableOpacity>
-        <TouchableOpacity style={[styles.heatmapHeaderButton, mapaCalorAtivo && styles.heatmapHeaderButtonActive]} onPress={() => setMapaCalorAtivo(atual => !atual)}>
+        <TouchableOpacity style={styles.sosHeaderButton} accessibilityLabel="Contatos de emergência" onPress={() => setModalContatosVisivel(true)}><Text style={styles.sosHeaderText}>SOS</Text></TouchableOpacity>
+        <TouchableOpacity style={[styles.heatmapHeaderButton, mapaCalorAtivo && styles.heatmapHeaderButtonActive]} accessibilityLabel="Mapa de calor" onPress={() => setMapaCalorAtivo(atual => !atual)}>
           <MaterialCommunityIcons name="fire" size={24} color={cores.icon} />
           </TouchableOpacity>
       </View>
@@ -722,7 +722,7 @@ export default function MapScreen() {
         </View>
       )}
 
-      <TouchableOpacity style={styles.locationButton} onPress={() => {
+      <TouchableOpacity style={styles.locationButton} accessibilityLabel="Centralizar na minha localização" onPress={() => {
         if(localizacao) {
           cameraRef.current?.setCamera({ centerCoordinate: [localizacao.longitude, localizacao.latitude], zoomLevel: 14, animationDuration: 700 });
         }
@@ -731,7 +731,7 @@ export default function MapScreen() {
       </TouchableOpacity>
 
       {administrador && (
-        <TouchableOpacity style={styles.addButton} onPress={pressionouBotaoAzul}>
+        <TouchableOpacity style={styles.addButton} accessibilityLabel="Nova ocorrência" onPress={pressionouBotaoAzul}>
           <FontAwesome6 name="plus" size={24} color={cores.icon} />
         </TouchableOpacity>
       )}
