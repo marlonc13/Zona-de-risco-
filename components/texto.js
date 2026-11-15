@@ -10,7 +10,8 @@ const TAMANHO_PADRAO = 14;
 const DentroDeTexto = createContext(false);
 
 // Aplica a escala de "Letras grandes" no fontSize e no lineHeight do estilo
-function escalarEstilo(style, escala, herdaTamanho) {
+// (exportada para os testes)
+export function escalarEstilo(style, escala, herdaTamanho) {
   if (escala === 1) return style;
 
   const plano = StyleSheet.flatten(style) || {};
