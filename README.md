@@ -188,9 +188,16 @@ O aplicativo atualiza a localização a cada ~60 segundos ou após deslocamento 
 ## Verificações do projeto
 
 ```bash
+npm test
 npm run lint
 npx expo-doctor
 ```
+
+### Testes automatizados
+
+Os testes ficam em `__tests__/` e cobrem as regras principais do app: ciclo de vida das ocorrências (o que aparece no mapa), controle de administradores, avisos de alertas próximos, orientações de risco e a opção "Letras grandes". Eles não usam o Firebase real nem precisam de celular.
+
+No GitHub, o workflow **Testes** (`.github/workflows/testes.yml`) roda `npm test` em todo push e em todo pull request para a `main`. A `main` é protegida: as alterações entram por pull request e o merge só é liberado quando os testes passam.
 
 ## Observações importantes
 
