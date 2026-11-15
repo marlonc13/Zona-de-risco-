@@ -1,22 +1,19 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 import { useColorScheme } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-// Como você está em app/(tabs)/context, precisa subir 3 níveis para chegar na raiz 
-// e depois entrar em constants:
-import { Colors } from '../constants/theme'; 
 
 const ThemeContext = createContext();
 
+// themeMode: escolha do usuário ('light' | 'dark' | 'system')
+// activeTheme: tema aplicado de fato ('light' | 'dark')
 export const ThemeProvider = ({ children }) => {
-  const deviceTheme = useColorScheme(); 
-  const [themeMode, setThemeMode] = useState('system'); 
+  const deviceTheme = useColorScheme();
+  const [themeMode, setThemeMode] = useState('system');
 
   useEffect(() => {
-    const loadTheme = async () => {
-      const savedTheme = await AsyncStorage.getItem('tema');
-      if (savedTheme) setThemeMode(savedTheme);
-    };
-    loadTheme();
+    AsyncStorage.getItem('tema')
+      .then(savedTheme => { if (savedTheme) setThemeMode(savedTheme); })
+      .catch(() => {});
   }, []);
 
   const toggleTheme = async (newTheme) => {
@@ -25,17 +22,12 @@ export const ThemeProvider = ({ children }) => {
   };
 
   const activeTheme = themeMode === 'system' ? (deviceTheme || 'light') : themeMode;
-  const themeData = Colors[activeTheme];
 
   return (
-    <ThemeContext.Provider value={{ themeMode, toggleTheme, themeData, activeTheme }}>
+    <ThemeContext.Provider value={{ themeMode, toggleTheme, activeTheme }}>
       {children}
     </ThemeContext.Provider>
   );
 };
 
 export const useTheme = () => useContext(ThemeContext);
-
-export default function ThemeContextRoute() {
-  return null;
-}

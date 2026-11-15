@@ -1,6 +1,5 @@
 import { criarEstilos } from '../hooks/use-tema';
 
-// Cores que só esta tela usa (as comuns vêm de constants/theme.js)
 const locais = {
   light: { botaoEscuro: '#202124' },
   dark: { botaoEscuro: '#5f6368' },

@@ -127,7 +127,6 @@ export default function Familiares() {
   );
 }
 
-// Cores que só esta tela usa (as comuns vêm de constants/theme.js)
 const locais = {
   light: { inputFundo: '#f8fafd', removerTexto: '#b3261e', riscoTexto: '#6d3a00' },
   dark: { inputFundo: '#18191b', removerTexto: '#f28b82', riscoTexto: '#f6c26b' },

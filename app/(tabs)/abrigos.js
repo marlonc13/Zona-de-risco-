@@ -185,7 +185,14 @@ export default function AbrigosScreen() {
 
   const excluirAbrigo = abrigo => Alert.alert('Excluir abrigo', `Deseja excluir ${abrigo.nome}?`, [
     { text: 'Cancelar', style: 'cancel' },
-    { text: 'Excluir', style: 'destructive', onPress: () => deleteDoc(doc(db, 'abrigos', abrigo.id)) },
+    { text: 'Excluir', style: 'destructive', onPress: async () => {
+      try {
+        await deleteDoc(doc(db, 'abrigos', abrigo.id));
+      } catch (erro) {
+        console.error('Erro ao excluir abrigo:', erro);
+        Alert.alert('Erro', 'Não foi possível excluir o abrigo.');
+      }
+    } },
   ]);
 
   const abrirRota = async abrigo => {

@@ -66,7 +66,10 @@ export default function AdministradoresScreen() {
 
   const remover = item => Alert.alert('Remover administrador', `Remover o acesso administrativo de ${item.email}?`, [
     { text: 'Cancelar', style: 'cancel' },
-    { text: 'Remover', style: 'destructive', onPress: () => deleteDoc(doc(db, 'administradores', item.email)) },
+    { text: 'Remover', style: 'destructive', onPress: () => deleteDoc(doc(db, 'administradores', item.email)).catch(erro => {
+      console.error('Erro ao remover administrador:', erro);
+      Alert.alert('Erro', 'Não foi possível remover o acesso.');
+    }) },
   ]);
 
   if (!autorizada) return <View style={styles.loading}><Text style={styles.loadingText}>Verificando acesso...</Text></View>;

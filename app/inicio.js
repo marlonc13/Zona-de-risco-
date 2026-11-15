@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { View, TouchableOpacity, ImageBackground, Image, ActivityIndicator } from 'react-native';
+import { View, TouchableOpacity, ImageBackground, Image, ActivityIndicator, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from '../components/texto';
 import { useRouter } from 'expo-router';
-import { onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth } from '../services/firebaseConfig';
 import { verificarAdministrador } from '../services/accessControl';
+import { authenticateWithBiometrics, preferenciaBiometria } from '../services/biometricAuth';
 import estilosInicio from '../styles/inicio.styles';
 import { useEstilos } from '../hooks/use-tema';
 
@@ -13,25 +14,37 @@ export default function Inicio() {
   const router = useRouter();
   const styles = useEstilos(estilosInicio);
   const insets = useSafeAreaInsets();
-  const [verificando, setVerificando] = useState(true)
+  const [verificando, setVerificando] = useState(true);
 
+  // Trata só a sessão que já existia ao abrir o app. O login feito na tela de e-mail
+  // cuida da própria navegação, então os eventos seguintes são ignorados aqui.
   useEffect(() => {
-    const unsunscribe = onAuthStateChanged(auth, async(user) => {
-      if (user) {
-        try {
-          const administrador = await verificarAdministrador(user);
-          router.replace(administrador ? '/admin' : '/mapa');
-        } catch (error) {
-          console.error("Erro ao verificar perfil do usuário:", error);
-          router.replace('/mapa');
-        }
-      } else {
-      setVerificando(false);
-      }
-    });
+    let tratado = false;
+    const parar = onAuthStateChanged(auth, async user => {
+      if (tratado) return;
+      tratado = true;
 
-    return () => unsunscribe();
-  }, []);
+      if (!user) {
+        setVerificando(false);
+        return;
+      }
+
+      if (await preferenciaBiometria(user.uid)) {
+        const resultado = await authenticateWithBiometrics();
+        // sem biometria no aparelho (removida ou não cadastrada) a entrada segue normalmente
+        if (!resultado?.success && !resultado?.indisponivel) {
+          await signOut(auth);
+          setVerificando(false);
+          Alert.alert('Biometria não confirmada', 'Entre novamente com seu e-mail e senha.');
+          return;
+        }
+      }
+
+      const administrador = await verificarAdministrador(user);
+      router.replace(administrador ? '/admin' : '/mapa');
+    });
+    return () => parar();
+  }, [router]);
 
   if (verificando) {
     return (

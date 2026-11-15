@@ -1,16 +1,10 @@
-/**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
- */
-
 import { Platform } from 'react-native';
 
-// Tokens de cor por tema. No claro, cada valor é a cor que as telas já usavam,
-// então trocar '#202124' por cores.textStrong não muda nada no modo claro.
+// Tokens de cor por tema
 export const Colors = {
   light: {
     // usados pela tela de configurações e pelos componentes Themed*
-    background: '#d9e6ef',   // azul claro (igual seu layout)
+    background: '#d9e6ef',   // azul claro
     text: '#000',
     card: '#777',            // caixas cinzas
     primary: '#000',         // botões pretos

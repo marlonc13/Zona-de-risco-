@@ -1,18 +1,21 @@
 import { View, TouchableOpacity, Alert } from 'react-native';
 import { Text, TextInput } from '../components/texto';
-import { useState } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useEffect, useState } from 'react';
 import { router } from 'expo-router';
 import { deleteUser, EmailAuthProvider, reauthenticateWithCredential, updatePassword } from 'firebase/auth';
-import { Entypo, FontAwesome5, MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
+import { deleteDoc, doc, getDoc, getFirestore, setDoc } from 'firebase/firestore';
+import { FontAwesome5, MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 
-import { auth } from '../services/firebaseConfig';
+import app, { auth } from '../services/firebaseConfig';
+import { authenticateWithBiometrics, definirBiometria, preferenciaBiometria, removerPreferenciaBiometria } from '../services/biometricAuth';
 import { Colors } from '../constants/theme';
 import { useTheme } from '../contexts/ThemeContext';
 import { useFonte } from '../contexts/FonteContext';
 import ScreenWrapper from '../components/screen-wrapper';
 
 import styles from '../styles/config.styles';
+
+const db = getFirestore(app);
 
 const OPCOES_TEMA = [
   { valor: 'light', rotulo: 'Claro', icone: 'sunny-outline' },
@@ -28,8 +31,8 @@ export default function Config() {
 
   const { letraGrande, alternarLetraGrande } = useFonte();
   const [excluindoConta, setExcluindoConta] = useState(false);
+  const [biometriaAtiva, setBiometriaAtiva] = useState(false);
 
-  // senha
   const [senhaAberta, setSenhaAberta] = useState(false);
   const [senhaAtual, setSenhaAtual] = useState('');
   const [novaSenha, setNovaSenha] = useState('');
@@ -37,8 +40,32 @@ export default function Config() {
   const [mostrarSenhas, setMostrarSenhas] = useState(false);
   const [salvandoSenha, setSalvandoSenha] = useState(false);
 
-  // só quem entrou com email/senha pode trocar senha (contas Google não têm senha)
+  // só contas de e-mail/senha têm senha para trocar
   const usaSenha = auth.currentUser?.providerData?.some(p => p.providerId === 'password');
+
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (!user) return;
+    preferenciaBiometria(user.uid).then(ativa => setBiometriaAtiva(ativa === true)).catch(() => {});
+  }, []);
+
+  const alternarBiometria = async () => {
+    const user = auth.currentUser;
+    if (!user) return;
+    if (biometriaAtiva) {
+      await definirBiometria(user.uid, false);
+      setBiometriaAtiva(false);
+      return;
+    }
+    // só ativa depois de confirmar que a biometria do aparelho funciona
+    const resultado = await authenticateWithBiometrics();
+    if (resultado?.success) {
+      await definirBiometria(user.uid, true);
+      setBiometriaAtiva(true);
+    } else if (resultado?.indisponivel) {
+      Alert.alert('Biometria não disponível', 'Cadastre uma digital ou o rosto nas configurações do celular e tente de novo.');
+    }
+  };
 
   const alterarSenha = async () => {
     const user = auth.currentUser;
@@ -91,13 +118,25 @@ export default function Config() {
         return;
       }
 
-      await deleteUser(usuarioAtual);
-      await AsyncStorage.clear();
+      // Os dados do perfil (nome, foto, residência e pessoas acompanhadas) saem junto com a conta.
+      // O documento é apagado antes porque, depois de excluir a conta, não há mais permissão para isso;
+      // se a exclusão da conta falhar, ele é restaurado.
+      const referencia = doc(db, 'usuarios', usuarioAtual.uid);
+      const perfil = await getDoc(referencia);
+      if (perfil.exists()) await deleteDoc(referencia);
+      try {
+        await deleteUser(usuarioAtual);
+      } catch (erro) {
+        if (perfil.exists()) await setDoc(referencia, perfil.data());
+        throw erro;
+      }
+      await removerPreferenciaBiometria(usuarioAtual.uid);
 
       Alert.alert('Conta excluída', 'Sua conta foi excluída com sucesso.');
-      router.replace('/');
+      if (router.canDismiss()) router.dismissAll();
+      router.replace('/inicio');
     } catch (error) {
-      console.log('Erro ao excluir conta:', error);
+      console.error('Erro ao excluir conta:', error);
 
       if (error.code === 'auth/requires-recent-login') {
         Alert.alert(
@@ -112,21 +151,10 @@ export default function Config() {
     }
   };
 
-  const inputStyle = {
-    borderWidth: 1,
-    borderColor: '#9aa0a6',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginTop: 10,
-    color: cores.text,
-    fontSize: 16,
-  };
-
   return (
     <ScreenWrapper
       scrollable
-      includeTop={false} // o header da Stack já cuida do topo
+      includeTop={false}
       backgroundColor={cores.background}
       style={styles.container}
     >
@@ -141,7 +169,6 @@ export default function Config() {
           <>
             <Text style={[styles.sectionTitle, { color: cores.text }]}>Conta</Text>
 
-            {/* Residência */}
             <TouchableOpacity
               activeOpacity={0.8}
               style={[styles.optionCard, styles.optionRow, { backgroundColor: cores.card }]}
@@ -157,7 +184,6 @@ export default function Config() {
               <Ionicons name="chevron-forward" size={22} color="grey" />
             </TouchableOpacity>
 
-            {/* Senha */}
             {usaSenha && (
               <View style={[styles.optionCard, { backgroundColor: cores.card }]}>
                 <TouchableOpacity
@@ -226,12 +252,32 @@ export default function Config() {
                 )}
               </View>
             )}
+
+            <TouchableOpacity
+              activeOpacity={0.8}
+              style={[styles.optionCard, styles.optionRow, { backgroundColor: cores.card }]}
+              onPress={alternarBiometria}
+              accessibilityRole="switch"
+              accessibilityState={{ checked: biometriaAtiva }}
+            >
+              <View style={[styles.iconBadge, { backgroundColor: '#00897b' }]}>
+                <Ionicons name="finger-print" size={24} color="white" />
+              </View>
+              <View style={styles.optionTextArea}>
+                <Text style={[styles.label, { color: cores.text }]}>Entrar com biometria</Text>
+                <Text style={[styles.description, { color: cores.text }]}>Pede a digital ou o rosto ao abrir o app.</Text>
+              </View>
+              <Ionicons
+                name={biometriaAtiva ? 'checkmark-circle' : 'ellipse-outline'}
+                size={26}
+                color={biometriaAtiva ? '#43a047' : 'grey'}
+              />
+            </TouchableOpacity>
           </>
         )}
 
         <Text style={[styles.sectionTitle, { color: cores.text }]}>Aparência</Text>
 
-        {/* Tema */}
         <View style={[styles.optionCard, { backgroundColor: cores.card }]}>
           <View style={styles.optionRow}>
             <View style={[styles.iconBadge, { backgroundColor: '#3949ab' }]}>
@@ -272,7 +318,6 @@ export default function Config() {
 
         <Text style={[styles.sectionTitle, { color: cores.text }]}>Acessibilidade</Text>
 
-        {/* Letras grandes */}
         <TouchableOpacity
           activeOpacity={0.8}
           style={[styles.optionCard, styles.optionRow, { backgroundColor: cores.card }]}
@@ -294,7 +339,6 @@ export default function Config() {
           />
         </TouchableOpacity>
 
-        {/* Excluir conta */}
         {auth.currentUser && (
           <TouchableOpacity
             activeOpacity={0.8}

@@ -1,6 +1,5 @@
 import { criarEstilos } from '../hooks/use-tema';
 
-// Cores que só esta tela usa (as comuns vêm de constants/theme.js)
 const locais = {
   light: { bordaSelecionado: '#81c995' },
   dark: { bordaSelecionado: '#2d5f3c' },

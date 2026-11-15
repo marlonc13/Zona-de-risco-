@@ -81,7 +81,6 @@ export default function OcorrenciaDetalhes() {
     });
   }, [id]);
 
-  // Memoriza a geração do círculo para não recalcular a cada renderização
   const areaGeoJSON = useMemo(() => {
     if (!ocorrencia) return null;
     const { latitude, longitude, raioMetros, gravidade } = ocorrencia;
