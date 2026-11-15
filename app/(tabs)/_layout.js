@@ -50,7 +50,6 @@ export default function TabLayout() {
         ),
       }}
     >
-      {/* 1ª Aba: Mapa */}
       <Tabs.Screen
         name="mapa"
         options={{

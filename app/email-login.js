@@ -3,10 +3,9 @@ import { View, TouchableOpacity, ImageBackground, Alert, ActivityIndicator, Keyb
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text, TextInput } from '../components/texto';
 import { useRouter } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, signOut } from 'firebase/auth';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { auth } from '../services/firebaseConfig';
-import { authenticateWithBiometrics } from '../services/biometricAuth';
+import { authenticateWithBiometrics, definirBiometria, preferenciaBiometria } from '../services/biometricAuth';
 import estilosEmailLogin, { locais } from '../styles/email-login.styles';
 import { useEstilos, useTema } from '../hooks/use-tema';
 import { verificarAdministrador } from '../services/accessControl';
@@ -23,13 +22,11 @@ export default function EmailLogin() {
   const [mostrarSenha, setMostrarSenha] = useState(false);
   const [carregando, setCarregando] = useState(false);
 
-  const chaveBiometria = (uid) => `biometriaAtiva:${uid}`;
-
   const perguntarAtivarBiometria = () =>
     new Promise((resolve) => {
       Alert.alert(
         'Ativar biometria?',
-        'Deseja usar a biometria do celular para proteger essa conta nas próximas entradas?',
+        'Deseja usar a biometria do celular para proteger essa conta nas próximas vezes que abrir o app?',
         [
           { text: 'Agora não', style: 'cancel', onPress: () => resolve(false) },
           { text: 'Ativar', onPress: () => resolve(true) },
@@ -38,65 +35,26 @@ export default function EmailLogin() {
       );
     });
 
-const entrarNoApp = async (user) => {
-  await AsyncStorage.setItem('userToken', await user.getIdToken());
-  await AsyncStorage.setItem('userName', user.displayName || nome.trim() || 'Usuário');
-  await AsyncStorage.setItem('userEmail', user.email || email.trim());
+  // Quem acabou de digitar a senha já se identificou; a biometria protege as próximas
+  // aberturas do app (pedida na tela inicial). A pergunta aparece uma única vez por conta.
+  const entrarNoApp = async (user) => {
+    const administrador = await verificarAdministrador(user);
 
-  const administrador = await verificarAdministrador(user);
-  const destino = administrador ? '/admin' : '/mapa';
-  const chave = chaveBiometria(user.uid);
-  const valor = await AsyncStorage.getItem(chave); // 'true' | 'false' | null
-
-  // Conta que nunca ativou/recusou: pergunta uma única vez
-  let exigirBiometria = valor === 'true';
-  let ativandoAgora = false;
-
-  if (valor === null) {
-    ativandoAgora = await perguntarAtivarBiometria();
-    if (!ativandoAgora) {
-      await AsyncStorage.setItem(chave, 'false');
-      await AsyncStorage.setItem('biometriaAtiva', 'false');
-      router.replace(destino);
-      return;
+    if ((await preferenciaBiometria(user.uid)) === null) {
+      if (await perguntarAtivarBiometria()) {
+        const resultado = await authenticateWithBiometrics();
+        if (resultado?.success) {
+          await definirBiometria(user.uid, true);
+        } else if (resultado?.indisponivel) {
+          Alert.alert('Biometria não disponível', 'Cadastre uma biometria no celular e ative depois em Configurações.');
+        }
+      } else {
+        await definirBiometria(user.uid, false);
+      }
     }
-    exigirBiometria = true;
-  }
 
-  // Conta que recusou antes: entra direto, sem biometria
-  if (!exigirBiometria) {
-    await AsyncStorage.setItem('biometriaAtiva', 'false');
-    router.replace(destino);
-    return;
-  }
-
-  const resultado = await authenticateWithBiometrics();
-
-  if (resultado?.success) {
-    await AsyncStorage.setItem(chave, 'true');
-    await AsyncStorage.setItem('biometriaAtiva', 'true');
-    router.replace(destino);
-    return;
-  }
-
-  if (resultado?.message === 'Sem suporte a biometria' || resultado?.message === 'Cadastre biometria no celular') {
-    Alert.alert('Biometria não disponível', 'O login foi feito. Cadastre biometria no celular para usar essa proteção nas próximas entradas.');
-    await AsyncStorage.setItem('biometriaAtiva', 'false');
-    router.replace(destino);
-    return;
-  }
-
-  // Estava ativando agora e cancelou: entra sem ativar
-  if (ativandoAgora) {
-    await AsyncStorage.setItem('biometriaAtiva', 'false');
-    router.replace(destino);
-    return;
-  }
-
-  // Conta que já tinha biometria ativa e falhou: bloqueia
-  await signOut(auth);
-  Alert.alert('Biometria necessária', 'Para entrar, confirme sua biometria.');
-};
+    router.replace(administrador ? '/admin' : '/mapa');
+  };
 
   const enviar = async () => {
     const emailLimpo = email.trim().toLowerCase();
@@ -171,7 +129,7 @@ const entrarNoApp = async (user) => {
             </View>
 
             <Text style={styles.title}>{modoCadastro ? 'Criar conta' : 'Entrar'}</Text>
-            <Text style={styles.subtitle}>Use e-mail e senha. Depois confirme a biometria para acessar.</Text>
+            <Text style={styles.subtitle}>Use seu e-mail e senha. Se quiser, ative a biometria para as próximas entradas.</Text>
 
             {modoCadastro && (
               <TextInput

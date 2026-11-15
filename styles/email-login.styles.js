@@ -1,6 +1,5 @@
 import { criarEstilos } from '../hooks/use-tema';
 
-// Cores que só esta tela usa (as comuns vêm de constants/theme.js)
 export const locais = {
   light: { overlay: 'rgba(255,255,255,0.84)', subtitulo: '#444', placeholder: '#777' },
   dark: { overlay: 'rgba(30,31,34,0.88)', subtitulo: '#bdc1c6', placeholder: '#80868b' },

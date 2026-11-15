@@ -12,9 +12,10 @@ const db = getFirestore(app);
 const TIPOS = ['Alagamento', 'Enchente', 'Deslizamento', 'Vendaval','Incêndio florestal'];
 const GRAVIDADES = ['Atenção', 'Alerta', 'Emergência'];
 
+// Sem gravidade informada, o alerta conta como "Atenção" (o mesmo padrão do resto do app)
 function contarPor(lista, campo, opcoes = null) {
   const contagem = lista.reduce((acc, item) => {
-    const chave = item[campo] || 'Não informado';
+    const chave = item[campo] || (campo === 'gravidade' ? 'Atenção' : 'Não informado');
     acc[chave] = (acc[chave] || 0) + 1;
     return acc;
   }, {});

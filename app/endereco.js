@@ -33,18 +33,23 @@ export default function Endereco() {
         setBairro(dados.bairro || ''); setCidade(dados.cidade || ''); setEstado(dados.estado || '');
       }
     };
-    carregar();
+    carregar().catch(erro => console.error('Erro ao carregar endereço:', erro));
   }, [router]);
 
   const usarLocalizacao = async () => {
     const permissao = await Location.requestForegroundPermissionsAsync();
     if (!permissao.granted) return Alert.alert('Permissão necessária', 'Autorize a localização do celular.');
-    const posicao = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-    const [resultado] = await Location.reverseGeocodeAsync(posicao.coords);
-    if (resultado) {
-      setEndereco(resultado.street || resultado.name || ''); setNumero(resultado.streetNumber || '');
-      setBairro(resultado.district || resultado.subregion || ''); setCidade(resultado.city || resultado.region || '');
-      setEstado(resultado.region || '');
+    try {
+      const posicao = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+      const [resultado] = await Location.reverseGeocodeAsync(posicao.coords);
+      if (resultado) {
+        setEndereco(resultado.street || resultado.name || ''); setNumero(resultado.streetNumber || '');
+        setBairro(resultado.district || resultado.subregion || ''); setCidade(resultado.city || resultado.region || '');
+        setEstado(resultado.region || '');
+      }
+    } catch (erro) {
+      console.error('Erro ao usar a localização:', erro);
+      Alert.alert('Localização indisponível', 'Não foi possível obter sua localização agora. Preencha o endereço manualmente.');
     }
   };
 

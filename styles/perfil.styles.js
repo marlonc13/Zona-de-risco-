@@ -1,7 +1,6 @@
 import { Platform } from 'react-native';
 import { criarEstilos } from '../hooks/use-tema';
 
-// Cores que só esta tela usa (as comuns vêm de constants/theme.js)
 const locais = {
   light: { campoFundo: '#f8fafd', sombra: 0.08 },
   dark: { campoFundo: '#18191b', sombra: 0.3 },

@@ -14,7 +14,6 @@ import { criarEstilos, useEstilos, useTema } from '../hooks/use-tema';
 
 const db = getFirestore(app);
 
-// Cores que só esta tela usa (as comuns vêm de constants/theme.js)
 const locais = {
   light: { sairIcone: 'red' },
   dark: { sairIcone: '#f28b82' },
@@ -77,31 +76,31 @@ export default function Admin() {
       </View>
       <View style={styles.mainRisk}><Text style={styles.mainRiskLabel}>Risco ativo mais frequente</Text><Text style={styles.mainRiskValue}>{estatisticas.principal}</Text></View>
 
-      <TouchableOpacity style={[styles.primary, { flexDirection: 'row', alignItems: 'center', justifyContent: 'left' }]} onPress={() => router.replace('/mapa')}>
+      <TouchableOpacity style={[styles.primary, { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start' }]} onPress={() => router.replace('/mapa')}>
         <Entypo name="map" size={20} color={cores.onButton} style={{ marginRight: 8 }} />
         <Text style={styles.primaryText}> Abrir mapa</Text>
       </TouchableOpacity>
-      <TouchableOpacity style={[styles.card, { flexDirection: 'row', alignItems: 'center', justifyContent: 'left' }]} onPress={() => router.replace('/mapa?calor=1')}>
+      <TouchableOpacity style={[styles.card, { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start' }]} onPress={() => router.replace('/mapa?calor=1')}>
         <MaterialCommunityIcons name="fire" size={24} color={cores.icon} />
         <Text style={styles.cardText}> Ver estatísticas</Text>
       </TouchableOpacity>
-      <TouchableOpacity style={[styles.card, { flexDirection: 'row', alignItems: 'center', justifyContent: 'left' }]} onPress={() => router.push('/lista')}>
+      <TouchableOpacity style={[styles.card, { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start' }]} onPress={() => router.push('/lista')}>
         <Entypo name="text-document" size={24} color={cores.icon} />
         <Text style={styles.cardText}> Ver todas as ocorrências</Text>
       </TouchableOpacity>
-      <TouchableOpacity style={[styles.card, { flexDirection: 'row', alignItems: 'center', justifyContent: 'left' }]} onPress={() => router.push('/relatorio')}>
+      <TouchableOpacity style={[styles.card, { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start' }]} onPress={() => router.push('/relatorio')}>
         <Entypo name="bar-graph" size={24} color={cores.icon} />
         <Text style={styles.cardText}> Relatórios</Text>
       </TouchableOpacity>
-      {principal && <TouchableOpacity style={[styles.card, { flexDirection: 'row', alignItems: 'center', justifyContent: 'left' }]} onPress={() => router.push('/administradores')}>
+      {principal && <TouchableOpacity style={[styles.card, { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start' }]} onPress={() => router.push('/administradores')}>
         <Ionicons name="people" size={24} color={cores.icon} />
         <Text style={styles.cardText}> Cadastrar administradores</Text>
       </TouchableOpacity>}
-      <TouchableOpacity style={[styles.card, { flexDirection: 'row', alignItems: 'center', justifyContent: 'left' }]} onPress={() => router.push('/abrigos')}>
+      <TouchableOpacity style={[styles.card, { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start' }]} onPress={() => router.push('/abrigos')}>
         <FontAwesome5 name="house-user" size={24} color={cores.icon} />
         <Text style={styles.cardText}> Gerenciar abrigos</Text>
       </TouchableOpacity>
-      <TouchableOpacity style={[styles.card, { flexDirection: 'row', alignItems: 'center', justifyContent: 'left' }]} onPress={() => router.push('/perfil')}>
+      <TouchableOpacity style={[styles.card, { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start' }]} onPress={() => router.push('/perfil')}>
         <Ionicons name="person" size={24} color={cores.icon} />
         <Text style={styles.cardText}> Meu perfil</Text>
       </TouchableOpacity>

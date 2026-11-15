@@ -1,6 +1,5 @@
 import { criarEstilos } from '../hooks/use-tema';
 
-// Cores que só esta tela usa (as comuns vêm de constants/theme.js)
 const locais = {
   light: { telaFundo: '#f4f6f9', headerBorda: '#eef2f5', tituloTexto: '#1a1c1e', textoCinza: '#6c757d', semFotoFundo: '#e9ecef', autorTexto: '#747775', overlayForte: 'rgba(0,0,0,0.5)' },
   dark: { telaFundo: '#121212', headerBorda: '#2a2b2e', tituloTexto: '#e8eaed', textoCinza: '#bdc1c6', semFotoFundo: '#2a2b2e', autorTexto: '#9aa0a6', overlayForte: 'rgba(0,0,0,0.7)' },

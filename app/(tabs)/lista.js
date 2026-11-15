@@ -91,6 +91,25 @@ const obterTimestamp = (valor) => {
 
 const obterDataAtual = () => Date.now();
 
+const DESCRICAO_STATUS = {
+  rascunho: 'Não aparece para os usuários.',
+  ativo: 'Risco confirmado e publicado no mapa.',
+  monitoramento: 'Continua visível enquanto é acompanhado.',
+  controlado: 'Risco contido e retirado do mapa.',
+  encerrado: 'Atendimento concluído e arquivado.',
+};
+
+// Texto do selo de validade do card: mostra a data quando não é hoje e não fala em
+// "expira" para o que já saiu do mapa
+function textoValidade(item, statusAtual) {
+  if (statusAtual === 'rascunho' || !item.expiresAt) return 'Sem publicação';
+  if (!['ativo', 'monitoramento'].includes(statusAtual)) return 'Fora do mapa';
+  const validade = new Date(item.expiresAt);
+  const hora = validade.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  const ehHoje = validade.toDateString() === new Date().toDateString();
+  return ehHoje ? `Expira às ${hora}` : `Expira em ${validade.toLocaleDateString('pt-BR')} às ${hora}`;
+}
+
 export default function ListaAlertasScreen() {
   const router = useRouter();
   const styles = useEstilos(estilosLista);
@@ -121,7 +140,7 @@ export default function ListaAlertasScreen() {
       pararAdmin = observarStatusAdministrador(user, setAdministrador);
     });
     return () => { pararAuth(); pararAdmin(); };
-  }, [router]);
+  }, []);
 
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, 'marcacoes'), snapshot => {
@@ -509,7 +528,7 @@ export default function ListaAlertasScreen() {
                 </Text>
                 <View style={styles.cardHeaderRow}>
                   <Text style={styles.cardTitle}><IconeTipo tipo={item.tipo} size={18} color={cores.tint} /> {item.tipo}</Text>
-                  {item.expiresAt ? <Text style={styles.cardTime}>Expira às {new Date(item.expiresAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text> : <Text style={styles.cardTime}>Sem publicação</Text>}
+                  <Text style={styles.cardTime}>{textoValidade(item, statusAtual)}</Text>
                 </View>
 
                 <Text style={styles.cardDescription}>{item.comentario}</Text>
@@ -568,84 +587,16 @@ export default function ListaAlertasScreen() {
         <View style={[styles.statusModalOverlay, { paddingTop: 18 + insets.top, paddingBottom: 18 + insets.bottom }]}>
           <View style={styles.statusModalBox}>
             <Text style={styles.modalTitle}>Alterar situação</Text>
-            <Text style={styles.statusModalSubtitle}>
-              {alterandoStatus && (
-                <>
-                  <Text style={styles.modalTitle}>Alterar situação</Text>
-
-                  <Text style={styles.statusModalSubtitle}>
-                    {alterandoStatus.tipo} · situação atual:{' '}
-                    {dadosStatus(statusEfetivo(alterandoStatus)).label}
-                  </Text>
-
-                  {STATUS_ALERTA.map(item => {
-                    const selecionado =
-                      statusEfetivo(alterandoStatus) === item.id;
-
-                    return (
-                      <TouchableOpacity
-                        key={item.id}
-                        onPress={() => escolherStatus(alterandoStatus, item.id)}
-                        style={[
-                          styles.statusChoice,
-                          selecionado && {
-                            borderColor: item.cor,
-                            backgroundColor: item.fundo,
-                          },
-                        ]}
-                      >
-                        <IconeStatus
-                          id={item.id}
-                          size={22}
-                          color={item.cor}
-                        />
-
-                        <View style={{ flex: 1 }}>
-                          <Text
-                            style={[
-                              styles.statusChoiceLabel,
-                              selecionado && { color: item.cor },
-                            ]}
-                          >
-                            {item.label}
-                          </Text>
-
-                          <Text style={styles.statusChoiceDescription}>
-                            {item.id === 'rascunho'
-                              ? 'Não aparece para os usuários.'
-                              : item.id === 'ativo'
-                                ? 'Risco confirmado e publicado no mapa.'
-                                : item.id === 'monitoramento'
-                                  ? 'Continua visível enquanto é acompanhado.'
-                                  : item.id === 'controlado'
-                                    ? 'Risco contido e retirado do mapa.'
-                                    : 'Atendimento concluído e arquivado.'}
-                          </Text>
-                        </View>
-
-                        {selecionado && (
-                          <Text style={[styles.statusCurrentMark, { color: item.cor }]}>
-                            ATUAL
-                          </Text>
-                        )}
-                      </TouchableOpacity>
-                    );
-                  })}
-
-                  <TouchableOpacity
-                    style={styles.statusCancel}
-                    onPress={() => setAlterandoStatus(null)}
-                  >
-                    <Text style={styles.modalCancelText}>Cancelar</Text>
-                  </TouchableOpacity>
-                </>
-              )}
-            </Text>
+            {alterandoStatus && (
+              <Text style={styles.statusModalSubtitle}>
+                {alterandoStatus.tipo} · situação atual: {dadosStatus(statusEfetivo(alterandoStatus)).label}
+              </Text>
+            )}
             {STATUS_ALERTA.map(item => {
               const selecionado = statusEfetivo(alterandoStatus) === item.id;
               return <TouchableOpacity key={item.id} onPress={() => escolherStatus(alterandoStatus, item.id)} style={[styles.statusChoice, selecionado && { borderColor: item.cor, backgroundColor: item.fundo }]}>
                 <IconeStatus id={item.id} size={22} color={item.cor} />
-                <View style={{ flex: 1 }}><Text style={[styles.statusChoiceLabel, selecionado && { color: item.cor }]}>{item.label}</Text><Text style={styles.statusChoiceDescription}>{item.id === 'rascunho' ? 'Não aparece para os usuários.' : item.id === 'ativo' ? 'Risco confirmado e publicado no mapa.' : item.id === 'monitoramento' ? 'Continua visível enquanto é acompanhado.' : item.id === 'controlado' ? 'Risco contido e retirado do mapa.' : 'Atendimento concluído e arquivado.'}</Text></View>
+                <View style={{ flex: 1 }}><Text style={[styles.statusChoiceLabel, selecionado && { color: item.cor }]}>{item.label}</Text><Text style={styles.statusChoiceDescription}>{DESCRICAO_STATUS[item.id]}</Text></View>
                 {selecionado && <Text style={[styles.statusCurrentMark, { color: item.cor }]}>ATUAL</Text>}
               </TouchableOpacity>;
             })}

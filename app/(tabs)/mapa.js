@@ -14,7 +14,7 @@ import * as ImagePicker from 'expo-image-picker';
 
 import { isAdminUser, observarStatusAdministrador } from '../../services/accessControl';
 import { avisarAlertasProximos, distanciaKm } from '../../services/proximityNotifications';
-import { RAIOS_ALERTA, dadosGravidade, formatarRaio, orientacaoDoRisco } from '../../services/riskGuidance';
+import { GRAVIDADES, RAIOS_ALERTA, dadosGravidade, formatarRaio, orientacaoDoRisco } from '../../services/riskGuidance';
 import { buscarClimaAtual } from '../../services/weatherService';
 import { uploadImage } from '../../services/imageUpload';
 import CameraCaptura from '../../components/camera-captura';
@@ -71,18 +71,6 @@ const OPCOES_TEMPO = [
   { label: '1 Hora', valor: 60 * 60 * 1000 },
   { label: '2 Horas', valor: 120 * 60 * 1000 },
 ];
-
-function iconeDoTipo(tipo, cor = '#5f6368') {
-  if (!tipo) return <Entypo name="location-pin" size={18} color={cor} />;
-  
-  const tipoNorm = normalizarTexto(tipo);
-  const encontrado = TIPOS_ALERTA.find(item => {
-    const labelNorm = normalizarTexto(item.label);
-    return labelNorm.includes(tipoNorm) || tipoNorm.includes(labelNorm);
-  });
-  
-  return encontrado ? encontrado.renderIcon(cor) : <Entypo name="location-pin" size={18} color={cor} />;
-}
 
 function comTimeout(promise, ms = 25000) { 
   return Promise.race([
@@ -158,6 +146,7 @@ export default function MapScreen() {
   const [modalContatosVisivel, setModalContatosVisivel] = useState(false);
   // Fim da barra "Zona de Risco": os filtros ficam logo abaixo dela, mesmo com "Letras grandes"
   const [fimBarraSuperior, setFimBarraSuperior] = useState(null);
+  const [fimFiltros, setFimFiltros] = useState(null);
   const [centroInicial, setCentroInicial] = useState(null);
   const jaCentralizou = useRef(false);
   const usuarioMexeuNoMapa = useRef(false);
@@ -296,7 +285,7 @@ export default function MapScreen() {
     const origem = localizacao ? `&origin=${localizacao.latitude},${localizacao.longitude}` : '';
     try {
       await Linking.openURL(`https://www.google.com/maps/dir/?api=1${origem}&destination=${destino}&travelmode=walking`);
-    } catch (erro) {
+    } catch {
       Alert.alert('Rota indisponível', 'Não foi possível abrir o Google Maps agora.');
     }
   };
@@ -492,6 +481,7 @@ export default function MapScreen() {
       setModalVisivel(false);
       Alert.alert(rascunho ? 'Rascunho salvo' : 'Sucesso', rascunho ? 'A ocorrência ficou disponível apenas no painel administrativo.' : 'Alerta adicionado ao mapa!');
     } catch (erro) {
+      console.error('Erro ao salvar alerta:', erro);
       Alert.alert('Erro ao Salvar', 'Não foi possível salvar o alerta. Verifique a internet e as regras do Firestore.');
     } finally {
       setSalvando(false);
@@ -499,9 +489,6 @@ export default function MapScreen() {
   };
 
   const abrirPerfil = () => {
-    console.log('Estado do usuário:', usuario);
-    console.log('É administrador?:', administrador);
-
     if (!usuario) return router.push('/email-login');
     router.push(administrador ? '/admin' : '/perfil');
   };
@@ -659,7 +646,15 @@ export default function MapScreen() {
           </TouchableOpacity>
       </View>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={[styles.filterBar, fimBarraSuperior !== null ? { top: fimBarraSuperior + ESPACO_FILTROS } : { marginTop: insets.top - 35 }]}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={[styles.filterBar, fimBarraSuperior !== null ? { top: fimBarraSuperior + ESPACO_FILTROS } : { marginTop: insets.top - 35 }]}
+        onLayout={e => {
+          const { y, height } = e.nativeEvent.layout;
+          setFimFiltros(y + height);
+        }}
+      >
         {TIPOS_ALERTA.map(tipo => (
           <TouchableOpacity key={tipo.label} onPress={() => setFiltroAtivo(tipo.label)} style={[styles.chip, { flexDirection: 'row', alignItems: 'center', gap: 2 }, filtroAtivo === tipo.label && { backgroundColor: tipo.cor }]}>
             {tipo.renderIcon(filtroAtivo === tipo.label ? '#fff' : cores.textMuted)}
@@ -667,6 +662,54 @@ export default function MapScreen() {
           </TouchableOpacity>
         ))}
       </ScrollView>
+
+      {(alertaEmergencia || alertasPertoCasa.length > 0 || alertasPertoFamilia.length > 0) && (
+        <View style={[styles.avisosTopo, { top: (fimFiltros ?? 172) + 8 }]} pointerEvents="box-none">
+          {alertaEmergencia && (
+            <TouchableOpacity style={styles.emergencyBanner} onPress={() => setModalEmergenciaVisivel(true)}>
+              <Text style={styles.emergencyBannerTitle}>🔴 EMERGÊNCIA NA SUA ÁREA</Text>
+              <Text style={styles.emergencyBannerText}>{alertaEmergencia.tipo}: toque para ver as instruções de evacuação</Text>
+            </TouchableOpacity>
+          )}
+          {alertasPertoCasa.length > 0 ? (
+            <TouchableOpacity
+              style={styles.homeWarning}
+              onPress={() => {
+                const alerta = alertasPertoCasa[0];
+                cameraRef.current?.setCamera({ centerCoordinate: [alerta.longitude, alerta.latitude], zoomLevel: ZOOM_USUARIO, animationDuration: 700 });
+              }}
+            >
+              <Text style={styles.homeWarningText}>🏠 {alertasPertoCasa.length} alerta(s) na área da sua residência</Text>
+            </TouchableOpacity>
+          ) : alertasPertoFamilia.length > 0 && (
+            <TouchableOpacity style={styles.familyWarning} onPress={() => router.push('/familiares')}>
+              <Text style={styles.familyWarningText}>👥 {alertasPertoFamilia.length} alerta(s) perto de pessoas acompanhadas</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
+
+      {mapaCalorAtivo ? (
+        <View style={styles.heatmapLegend} pointerEvents="none">
+          <Text style={styles.heatmapLegendTitle}>Concentração histórica</Text>
+          <View style={styles.heatmapGradient}>
+            {['#2b83ba', '#abdda4', '#ffffbf', '#fdae61', '#d7191c'].map(cor => (
+              <View key={cor} style={[styles.heatmapColor, { backgroundColor: cor }]} />
+            ))}
+          </View>
+          <View style={styles.heatmapLegendLabels}>
+            <Text style={styles.heatmapLegendText}>Menos</Text>
+            <Text style={styles.heatmapLegendText}>Mais</Text>
+          </View>
+          <Text style={styles.heatmapCount}>{heatmapGeoJSON.features.length} ocorrência(s) analisada(s)</Text>
+        </View>
+      ) : clima && (
+        <View style={styles.weatherBox} pointerEvents="none">
+          <Text style={styles.weatherTitle}>🌤️ {clima.descricao} · {Math.round(clima.temperatura)}°C</Text>
+          <Text style={styles.weatherText}>Chuva {clima.chuva ?? 0} mm · Vento {Math.round(clima.vento ?? 0)} km/h</Text>
+          <Text style={styles.weatherSource}>Open-Meteo · dados auxiliares</Text>
+        </View>
+      )}
 
       {alertaSelecionado && (
         <View style={styles.shareAlertBox}>
@@ -729,11 +772,44 @@ export default function MapScreen() {
                 ))}
               </ScrollView>
 
+              <Text style={styles.sectionLabel}>Nível de risco:</Text>
+              <View style={styles.optionRow}>
+                {GRAVIDADES.map(item => (
+                  <TouchableOpacity key={item.label} onPress={() => setGravidadeSelecionada(item.label)} style={[styles.optionChip, gravidadeSelecionada === item.label && { backgroundColor: item.cor }]}>
+                    <Text style={[styles.optionText, gravidadeSelecionada === item.label && styles.optionTextActive]}>{item.emoji} {item.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
               <Text style={styles.sectionLabel}>Área afetada:</Text>
               <View style={styles.optionRow}>
                 {RAIOS_ALERTA.map(item => (
                   <TouchableOpacity key={item.valor} onPress={() => setRaioSelecionado(item.valor)} style={[styles.optionChip, raioSelecionado === item.valor && styles.tempoChipAtivo]}>
                     <Text style={[styles.optionText, raioSelecionado === item.valor && styles.optionTextActive]}>{item.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <View style={styles.guidanceBox}>
+                <Text style={styles.guidanceTitle}>🛡️ Orientação que será exibida</Text>
+                <Text style={styles.guidanceText}>{orientacaoDoRisco(tipoSelecionado)}</Text>
+              </View>
+
+              {gravidadeSelecionada === 'Emergência' && (
+                <View style={styles.emergencyAdminNotice}>
+                  <Text style={styles.emergencyAdminTitle}>🔴 Este alerta acionará o modo de emergência</Text>
+                  <Text style={styles.emergencyAdminText}>Usuários dentro da área receberão instruções de evacuação, checklist e telefones de emergência.</Text>
+                </View>
+              )}
+
+              <Text style={styles.sectionLabel}>Tempo de permanência no mapa:</Text>
+              <View style={styles.tempoRow}>
+                <TouchableOpacity onPress={() => setTempoSelecionado(null)} style={[styles.tempoChipOpcao, tempoSelecionado === null && styles.tempoChipAtivo]}>
+                  <Text style={[styles.tempoTextoOpcao, tempoSelecionado === null && styles.tempoTextoAtivo]}>⚡ Automático ({foto ? '1h' : '30min'})</Text>
+                </TouchableOpacity>
+                {OPCOES_TEMPO.map(opcao => (
+                  <TouchableOpacity key={opcao.label} onPress={() => setTempoSelecionado(opcao.valor)} style={[styles.tempoChipOpcao, tempoSelecionado === opcao.valor && styles.tempoChipAtivo]}>
+                    <Text style={[styles.tempoTextoOpcao, tempoSelecionado === opcao.valor && styles.tempoTextoAtivo]}>{opcao.label}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -748,7 +824,8 @@ export default function MapScreen() {
               </View>
 
               <View style={styles.modalButtons}>
-                <TouchableOpacity style={[styles.modalButton, styles.cancelButton]} onPress={() => setModalVisivel(false)}><Text style={styles.cancelText}>Cancelar</Text></TouchableOpacity>
+                <TouchableOpacity style={[styles.modalButton, styles.cancelButton]} onPress={() => setModalVisivel(false)} disabled={salvando}><Text style={styles.cancelText}>Cancelar</Text></TouchableOpacity>
+                <TouchableOpacity style={[styles.modalButton, styles.draftButton]} onPress={() => salvarMarcacao('rascunho')} disabled={salvando}><Text style={styles.draftText}>Salvar rascunho</Text></TouchableOpacity>
                 <TouchableOpacity style={[styles.modalButton, styles.saveButton]} onPress={() => salvarMarcacao('ativo')} disabled={salvando}><Text style={styles.saveText}>{salvando ? 'Salvando...' : 'Publicar'}</Text></TouchableOpacity>
               </View>
               </ScrollView>
