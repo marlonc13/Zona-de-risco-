@@ -1,5 +1,6 @@
 import { ActivityIndicator, ScrollView, View } from 'react-native';
 import { Text } from '../../components/texto';
+import Icone from '../../components/icone';
 import { useEffect, useMemo, useState } from 'react';
 import { collection, getFirestore, onSnapshot } from 'firebase/firestore';
 import Mapbox from '@rnmapbox/maps';
@@ -173,6 +174,6 @@ const heatmapGeoJSON = useMemo(() => {
     <View style={styles.section}><Text style={styles.sectionTitle}>Ocorrências por gravidade</Text>{dados.gravidades.map(item => <Barra key={item.nome} {...item} maximo={maiorGravidade} cor={{ Atenção: '#f9ab00', Alerta: '#e8710a', Emergência: '#d93025' }[item.nome]} styles={styles} />)}</View>
     <View style={styles.section}><Text style={styles.sectionTitle}>Bairros com mais registros (até 8)</Text>{dados.bairros.length ? dados.bairros.map(item => <Barra key={item.nome} {...item} maximo={maiorBairro} cor="#7b1fa2" styles={styles} />) : <Text style={styles.empty}>Ainda não há bairros informados.</Text>}</View>
 
-    <View style={styles.privacyBox}><Text style={styles.privacyTitle}>🔒 Painel somente para consulta</Text><Text style={styles.privacyText}>Usuários e visitantes não podem editar estes dados. Informações de administradores e moradores não aparecem nesta tela.</Text></View>
+    <View style={styles.privacyBox}><Text style={styles.privacyTitle}><Icone nome="cadeado" size={15} /> Painel somente para consulta</Text><Text style={styles.privacyText}>Usuários e visitantes não podem editar estes dados. Informações de administradores e moradores não aparecem nesta tela.</Text></View>
   </ScrollView>;
 }

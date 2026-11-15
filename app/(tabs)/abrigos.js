@@ -4,6 +4,7 @@ import { Text, TextInput } from '../../components/texto';
 import { addDoc, collection, deleteDoc, doc, getFirestore, onSnapshot, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import { FontAwesome6 } from '@expo/vector-icons';
+import Icone from '../../components/icone';
 
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
@@ -13,7 +14,7 @@ import { distanciaKm } from '../../services/proximityNotifications';
 import { pesquisarEnderecos } from '../../services/addressSearch';
 import { uploadImage } from '../../services/imageUpload';
 import CameraCaptura from '../../components/camera-captura';
-import ModalDeslizante from '../../components/modal-deslizante';
+import ModalDeslizante, { RolagemModal } from '../../components/modal-deslizante';
 import app, { auth } from '../../services/firebaseConfig';
 import estilosAbrigos from '../../styles/abrigos.styles';
 import { useEstilos, useTema } from '../../hooks/use-tema';
@@ -249,25 +250,25 @@ export default function AbrigosScreen() {
         ListEmptyComponent={<Text style={styles.empty}>Nenhum local cadastrado nesta categoria.</Text>}
         renderItem={({ item }) => (
           <View style={styles.card}>
-            {item.fotoUrl ? <Image source={{ uri: item.fotoUrl }} style={styles.image} /> : <View style={styles.placeholder}><Text style={styles.placeholderIcon}>🏠</Text></View>}
+            {item.fotoUrl ? <Image source={{ uri: item.fotoUrl }} style={styles.image} /> : <View style={styles.placeholder}><Icone nome="casa" size={42} color={cores.textMuted} /></View>}
             <View style={styles.cardBody}>
               <View style={styles.cardTop}>
                 <Text style={styles.cardTitle}>{item.nome}</Text>
                 <Text style={[styles.status, { color: corSituacao(item.situacao) }]}>{item.situacao}</Text>
               </View>
               <Text style={styles.category}>{item.categoria}</Text>
-              <Text style={styles.address}>📍 {item.endereco}</Text>
+              <Text style={styles.address}><Icone nome="localizacao" size={13} /> {item.endereco}</Text>
               {item.distancia !== null && <Text style={styles.distance}>{item.distancia.toFixed(1)} km da sua localização</Text>}
-              {!!item.horario && <Text style={styles.info}>🕐 {item.horario}</Text>}
-              {!!item.telefone && <Text style={styles.info}>☎️ {item.telefone}</Text>}
-              <Text style={styles.info}>👥 Capacidade aproximada: {item.capacidade || 'não informada'}</Text>
+              {!!item.horario && <Text style={styles.info}><Icone nome="relogio" size={13} /> {item.horario}</Text>}
+              {!!item.telefone && <Text style={styles.info}><Icone nome="telefone" size={13} /> {item.telefone}</Text>}
+              <Text style={styles.info}><Icone nome="pessoas" size={13} /> Capacidade aproximada: {item.capacidade || 'não informada'}</Text>
               <View style={styles.tags}>
-                {item.acessivel && <Text style={styles.tag}>♿ Acessível</Text>}
-                {item.aceitaAnimais && <Text style={styles.tag}>🐾 Aceita animais</Text>}
+                {item.acessivel && <Text style={styles.tag}><Icone nome="acessivel" size={11} /> Acessível</Text>}
+                {item.aceitaAnimais && <Text style={styles.tag}><Icone nome="animais" size={11} /> Aceita animais</Text>}
                 {(item.recursos || []).map(recurso => <Text key={recurso} style={styles.tag}>{recurso}</Text>)}
               </View>
               <TouchableOpacity style={styles.routeButton} onPress={() => abrirRota(item)}>
-                <Text style={styles.routeText}>🧭 Abrir rota</Text>
+                <Text style={styles.routeText}><Icone nome="rota" size={14} /> Abrir rota</Text>
               </TouchableOpacity>
               {administrador && <View style={styles.adminActions}>
                 <TouchableOpacity style={styles.editButton} onPress={() => abrirEdicao(item)}><Text style={styles.editText}>Editar</Text></TouchableOpacity>
@@ -299,7 +300,7 @@ export default function AbrigosScreen() {
           />
         )}
       >
-            <ScrollView showsVerticalScrollIndicator={false}>
+            <RolagemModal showsVerticalScrollIndicator={false}>
               <Text style={styles.modalTitle}>{editandoId ? 'Editar local' : 'Cadastrar local seguro'}</Text>
               <TextInput style={styles.input} placeholderTextColor={cores.placeholder} placeholder="Nome do local" value={formulario.nome} onChangeText={valor => alterarCampo('nome', valor)} />
               <Text style={styles.label}>Localização do abrigo</Text>
@@ -317,11 +318,11 @@ export default function AbrigosScreen() {
                 returnKeyType="search"
               />
               <TouchableOpacity style={styles.searchButton} onPress={pesquisarEndereco} disabled={buscandoEndereco}>
-                <Text style={styles.searchButtonText}>{buscandoEndereco ? 'Pesquisando...' : '🔎 Pesquisar endereço'}</Text>
+                <Text style={styles.searchButtonText}>{buscandoEndereco ? 'Pesquisando...' : <><Icone nome="pesquisar" size={14} /> Pesquisar endereço</>}</Text>
               </TouchableOpacity>
               {resultadosEndereco.map(resultado => (
                 <TouchableOpacity key={resultado.id} style={styles.searchResult} onPress={() => selecionarEndereco(resultado)}>
-                  <Text style={styles.searchResultIcon}>📍</Text>
+                  <Icone nome="localizacao" size={18} color={cores.tint} style={styles.searchResultIcon} />
                   <View style={styles.searchResultBody}>
                     <Text style={styles.searchResultText}>{resultado.endereco}</Text>
                     <Text style={styles.searchResultHint}>Toque para selecionar</Text>
@@ -330,7 +331,7 @@ export default function AbrigosScreen() {
               ))}
               {!!formulario.latitude && !!formulario.longitude && (
                 <View style={styles.selectedAddress}>
-                  <Text style={styles.selectedAddressTitle}>✓ Endereço selecionado</Text>
+                  <Text style={styles.selectedAddressTitle}><Icone nome="check" size={14} /> Endereço selecionado</Text>
                   <Text style={styles.selectedAddressText}>{formulario.endereco}</Text>
                 </View>
               )}
@@ -346,20 +347,20 @@ export default function AbrigosScreen() {
               <TextInput style={styles.input} placeholderTextColor={cores.placeholder} placeholder="Horário de funcionamento" value={formulario.horario} onChangeText={valor => alterarCampo('horario', valor)} />
               <TextInput style={styles.input} placeholderTextColor={cores.placeholder} placeholder="Capacidade aproximada" value={String(formulario.capacidade || '')} onChangeText={valor => alterarCampo('capacidade', valor)} keyboardType="numeric" />
 
-              <View style={styles.switchRow}><Text style={styles.switchLabel}>♿ Possui acessibilidade</Text><Switch value={formulario.acessivel} onValueChange={valor => alterarCampo('acessivel', valor)} /></View>
-              <View style={styles.switchRow}><Text style={styles.switchLabel}>🐾 Aceita animais</Text><Switch value={formulario.aceitaAnimais} onValueChange={valor => alterarCampo('aceitaAnimais', valor)} /></View>
+              <View style={styles.switchRow}><Text style={styles.switchLabel}><Icone nome="acessivel" size={15} /> Possui acessibilidade</Text><Switch value={formulario.acessivel} onValueChange={valor => alterarCampo('acessivel', valor)} /></View>
+              <View style={styles.switchRow}><Text style={styles.switchLabel}><Icone nome="animais" size={15} /> Aceita animais</Text><Switch value={formulario.aceitaAnimais} onValueChange={valor => alterarCampo('aceitaAnimais', valor)} /></View>
 
               <Text style={styles.label}>Recursos disponíveis</Text>
               <View style={styles.options}>{RECURSOS.map(item => <TouchableOpacity key={item} onPress={() => alternarRecurso(item)} style={[styles.option, formulario.recursos.includes(item) && styles.optionActive]}><Text style={[styles.optionText, formulario.recursos.includes(item) && styles.optionTextActive]}>{item}</Text></TouchableOpacity>)}</View>
 
               {formulario.fotoUrl && <Image source={{ uri: formulario.fotoUrl }} style={styles.preview} />}
-              <View style={styles.photoActions}><TouchableOpacity style={styles.photoButton} onPress={tirarFoto}><Text style={styles.photoText}>📷 Tirar foto</Text></TouchableOpacity><TouchableOpacity style={styles.photoButton} onPress={escolherFoto}><Text style={styles.photoText}>🖼️ Galeria</Text></TouchableOpacity></View>
+              <View style={styles.photoActions}><TouchableOpacity style={styles.photoButton} onPress={tirarFoto}><Text style={styles.photoText}><Icone nome="camera" size={15} /> Tirar foto</Text></TouchableOpacity><TouchableOpacity style={styles.photoButton} onPress={escolherFoto}><Text style={styles.photoText}><Icone nome="galeria" size={15} /> Galeria</Text></TouchableOpacity></View>
 
               <View style={styles.modalActions}>
                 <TouchableOpacity style={styles.cancelButton} onPress={() => setModalVisivel(false)}><Text style={styles.cancelText}>Cancelar</Text></TouchableOpacity>
                 <TouchableOpacity style={styles.saveButton} onPress={salvarAbrigo} disabled={salvando}><Text style={styles.saveText}>{salvando ? 'Salvando...' : 'Salvar'}</Text></TouchableOpacity>
               </View>
-            </ScrollView>
+            </RolagemModal>
       </ModalDeslizante>
     </View>
   );

@@ -13,13 +13,9 @@ import estilosOcorrencia from '../../styles/ocorrencia.styles';
 import { STATUS_ALERTA, dadosStatus, statusEfetivo } from '../../services/alertLifecycle';
 import { compartilharAlertaWhatsApp } from '../../services/shareAlert';
 import { useEstilos, useTema } from '../../hooks/use-tema';
+import Icone, { IconeGravidade, IconeStatus, IconeTipo } from '../../components/icone';
 
 const db = getFirestore(app);
-
-const EMOJIS = {
-  Alagamento: '🌊', Enchente: '🌧️', Deslizamento: '⛰️', Vendaval: '🌪️',
-  Seca: '☀️', 'Incêndio florestal': '🔥',
-};
 
 function formatarData(valor) {
   if (!valor) return 'Não informado';
@@ -104,20 +100,20 @@ export default function OcorrenciaDetalhes() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: 40 + insets.bottom }]}>
       <View style={[styles.topBar, { paddingTop: Math.max(48, insets.top + 12) }]}>
-        <TouchableOpacity style={styles.iconButton} onPress={() => router.back()}><Text escalavel={false} style={styles.iconButtonText}>‹</Text></TouchableOpacity>
+        <TouchableOpacity style={styles.iconButton} onPress={() => router.back()}><Icone nome="voltar" size={26} color={cores.textStrong} escalavel={false} /></TouchableOpacity>
         <Text style={styles.topTitle}>Detalhes da ocorrência</Text>
-        <TouchableOpacity accessibilityLabel="Compartilhar alerta pelo WhatsApp" style={[styles.iconButton, styles.shareIconButton]} onPress={() => compartilharAlertaWhatsApp(ocorrencia)}><Text escalavel={false} style={styles.shareIconText}>↗</Text></TouchableOpacity>
+        <TouchableOpacity accessibilityLabel="Compartilhar alerta pelo WhatsApp" style={[styles.iconButton, styles.shareIconButton]} onPress={() => compartilharAlertaWhatsApp(ocorrencia)}><Icone nome="whatsapp" size={22} color="#fff" escalavel={false} /></TouchableOpacity>
       </View>
 
-      {ocorrencia.fotoUrl ? <Image source={{ uri: ocorrencia.fotoUrl }} style={styles.heroImage} /> : <View style={styles.heroPlaceholder}><Text style={styles.heroEmoji}>{EMOJIS[ocorrencia.tipo] || '📍'}</Text><Text style={styles.heroPlaceholderText}>Sem foto anexada</Text></View>}
+      {ocorrencia.fotoUrl ? <Image source={{ uri: ocorrencia.fotoUrl }} style={styles.heroImage} /> : <View style={styles.heroPlaceholder}><IconeTipo tipo={ocorrencia.tipo} size={54} color={cores.tint} /><Text style={styles.heroPlaceholderText}>Sem foto anexada</Text></View>}
 
       <View style={styles.mainCard}>
         <View style={styles.badges}>
-          <Text style={[styles.statusBadge, { color: statusDados.cor, backgroundColor: statusDados.fundo }]}>{statusDados.emoji} {statusDados.label.toUpperCase()}</Text>
-          <Text style={styles.officialBadge}>{ocorrencia.oficial === true ? '✓ ALERTA OFICIAL' : 'REGISTRO ANTERIOR'}</Text>
+          <Text style={[styles.statusBadge, { color: statusDados.cor, backgroundColor: statusDados.fundo }]}><IconeStatus id={statusAtual} size={11} /> {statusDados.label.toUpperCase()}</Text>
+          <Text style={styles.officialBadge}>{ocorrencia.oficial === true ? <><Icone nome="check" size={11} /> ALERTA OFICIAL</> : 'REGISTRO ANTERIOR'}</Text>
         </View>
-        <Text style={styles.type}>{EMOJIS[ocorrencia.tipo] || '📍'} {ocorrencia.tipo}</Text>
-        <Text style={[styles.severity, { color: gravidade.cor }]}>{gravidade.emoji} {ocorrencia.gravidade || 'Atenção'}</Text>
+        <Text style={styles.type}><IconeTipo tipo={ocorrencia.tipo} size={22} color={cores.tint} /> {ocorrencia.tipo}</Text>
+        <Text style={[styles.severity, { color: gravidade.cor }]}><IconeGravidade label={ocorrencia.gravidade || 'Atenção'} size={16} /> {ocorrencia.gravidade || 'Atenção'}</Text>
         <Text style={styles.description}>{ocorrencia.comentario}</Text>
       </View>
 
@@ -128,7 +124,7 @@ export default function OcorrenciaDetalhes() {
           const atual = item.id === statusAtual;
           const concluido = indice < indiceStatus;
           return <View key={item.id} style={styles.lifecycleItem}>
-            <View style={[styles.lifecycleDot, { backgroundColor: atual || concluido ? item.cor : cores.border }]}><Text escalavel={false} style={styles.lifecycleDotText}>{concluido ? '✓' : item.emoji}</Text></View>
+            <View style={[styles.lifecycleDot, { backgroundColor: atual || concluido ? item.cor : cores.border }]}>{concluido ? <Icone nome="check" size={14} color="#fff" escalavel={false} /> : <IconeStatus id={item.id} size={14} color="#fff" escalavel={false} />}</View>
             <View style={{ flex: 1 }}><Text style={[styles.lifecycleLabel, atual && { color: item.cor }]}>{item.label}</Text>{atual && <Text style={styles.lifecycleCurrent}>Estado atual</Text>}</View>
           </View>;
         })}
@@ -161,9 +157,9 @@ export default function OcorrenciaDetalhes() {
       </View>
 
       <View style={styles.guidanceBox}>
-        <Text style={styles.guidanceTitle}>🛡️ Como se proteger</Text>
+        <Text style={styles.guidanceTitle}><Icone nome="escudo" size={16} /> Como se proteger</Text>
         <Text style={styles.guidanceText}>{orientacaoDoRisco(ocorrencia.tipo)}</Text>
-        {ocorrencia.gravidade === 'Emergência' && <TouchableOpacity style={styles.shelterLink} onPress={() => router.push('/abrigos')}><Text style={styles.shelterLinkText}>🏠 Ver abrigos e pontos seguros</Text></TouchableOpacity>}
+        {ocorrencia.gravidade === 'Emergência' && <TouchableOpacity style={styles.shelterLink} onPress={() => router.push('/abrigos')}><Text style={styles.shelterLinkText}><Icone nome="casa" size={15} /> Ver abrigos e pontos seguros</Text></TouchableOpacity>}
       </View>
 
       {possuiCoordenadas && areaGeoJSON && (
@@ -197,15 +193,15 @@ export default function OcorrenciaDetalhes() {
           </Mapbox.MapView>
           
           <Text style={styles.coordinates}>Lat. {coordenada.latitude.toFixed(5)} · Long. {coordenada.longitude.toFixed(5)}</Text>
-          <TouchableOpacity style={styles.routeButton} onPress={abrirRota}><Text style={styles.routeButtonText}>🧭 Abrir rota no Google Maps</Text></TouchableOpacity>
+          <TouchableOpacity style={styles.routeButton} onPress={abrirRota}><Text style={styles.routeButtonText}><Icone nome="rota" size={15} /> Abrir rota no Google Maps</Text></TouchableOpacity>
         </View>
       )}
 
       <TouchableOpacity style={styles.whatsappButton} onPress={() => compartilharAlertaWhatsApp(ocorrencia)}>
-        <Text style={styles.whatsappButtonText}>💬 Compartilhar alerta pelo WhatsApp</Text>
+        <Text style={styles.whatsappButtonText}><Icone nome="whatsapp" size={16} /> Compartilhar alerta pelo WhatsApp</Text>
       </TouchableOpacity>
 
-      {administrador && <TouchableOpacity style={styles.adminButton} onPress={() => router.push('/lista')}><Text style={styles.adminButtonText}>⚙️ Gerenciar esta ocorrência</Text></TouchableOpacity>}
+      {administrador && <TouchableOpacity style={styles.adminButton} onPress={() => router.push('/lista')}><Text style={styles.adminButtonText}><Icone nome="engrenagem" size={15} /> Gerenciar esta ocorrência</Text></TouchableOpacity>}
     </ScrollView>
   );
 }

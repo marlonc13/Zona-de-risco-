@@ -22,7 +22,6 @@ export default criarEstilos((c, tema) => {
     card: { backgroundColor: c.surface, borderRadius: 18, marginBottom: 15, overflow: 'hidden', elevation: 3 },
     image: { width: '100%', height: 170 },
     placeholder: { height: 110, backgroundColor: c.tintBackground, justifyContent: 'center', alignItems: 'center' },
-    placeholderIcon: { fontSize: 42 },
     cardBody: { padding: 15 },
     cardTop: { flexDirection: 'row', justifyContent: 'space-between', gap: 10 },
     cardTitle: { flex: 1, color: c.textStrong, fontSize: 18, fontWeight: '900' },
