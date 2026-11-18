@@ -1,9 +1,9 @@
-import { View, TouchableOpacity, Alert, ScrollView, Image, Linking, ActivityIndicator } from 'react-native';
+import { View, TouchableOpacity, Alert, ScrollView, Image, Linking, ActivityIndicator, BackHandler } from 'react-native';
 import { Text, TextInput } from '../../components/texto';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useState, useEffect, useMemo, useRef } from 'react';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp, doc } from 'firebase/firestore';
 import { Entypo, Ionicons, FontAwesome5, MaterialCommunityIcons, Feather, FontAwesome, FontAwesome6 } from '@expo/vector-icons';
@@ -19,7 +19,7 @@ import { buscarClimaAtual } from '../../services/weatherService';
 import { uploadImage } from '../../services/imageUpload';
 import CameraCaptura from '../../components/camera-captura';
 import ModalDeslizante from '../../components/modal-deslizante';
-import { apareceNoMapa, statusEfetivo } from '../../services/alertLifecycle';
+import { apareceNoMapa, statusEfetivo, dentroDoPeriodo, periodoValido, PERIODOS_MAPA_CALOR, PERIODO_PADRAO_MAPA_CALOR } from '../../services/alertLifecycle';
 import { compartilharAlertaWhatsApp } from '../../services/shareAlert';
 
 import app from '../../services/firebaseConfig';
@@ -47,6 +47,7 @@ const ZOOM_USUARIO = 14;
 
 // Última posição do usuário, para o mapa já abrir no lugar certo na próxima vez
 const CHAVE_ULTIMA_LOCALIZACAO = 'ultimaLocalizacaoMapa';
+const CHAVE_PERIODO_MAPA_CALOR = 'periodoMapaCalor';
 
 const TIPOS_ALERTA = [
   { label: 'Todos', emoji: '🗺️', renderIcon: (color) => <Entypo name="map" size={18} color={color} />, cor: '#1a73e8' },
@@ -125,6 +126,11 @@ export default function MapScreen() {
   const [historicoAlertas, setHistoricoAlertas] = useState([]);
   const [mapaCalorAtivo, setMapaCalorAtivo] = useState(false);
   const [filtroAtivo, setFiltroAtivo] = useState('Todos');
+  // Período em vigor (salvo no aparelho) e o escolhido que ainda espera o "Aplicar".
+  // Enquanto não é confirmado, o escolhido só serve de prévia e é descartado ao sair.
+  const [periodoConfirmado, setPeriodoConfirmado] = useState(PERIODO_PADRAO_MAPA_CALOR);
+  const [periodoEmEscolha, setPeriodoEmEscolha] = useState(null);
+  const periodoMapaCalor = periodoEmEscolha ?? periodoConfirmado;
   const [modalVisivel, setModalVisivel] = useState(false);
   const [coordenadaSelecionada, setCoordenadaSelecionada] = useState(null);
   const [tipoSelecionado, setTipoSelecionado] = useState('Alagamento');
@@ -166,6 +172,40 @@ export default function MapScreen() {
   useEffect(() => {
     if (parametros.calor === '1') setMapaCalorAtivo(true);
   }, [parametros.calor]);
+
+  useEffect(() => {
+    AsyncStorage.getItem(CHAVE_PERIODO_MAPA_CALOR)
+      .then(salvo => { if (periodoValido(salvo)) setPeriodoConfirmado(salvo); })
+      .catch(() => {});
+  }, []);
+
+  const escolherPeriodo = periodoId => {
+    setPeriodoEmEscolha(periodoId === periodoConfirmado ? null : periodoId);
+  };
+
+  const aplicarPeriodo = () => {
+    if (!periodoEmEscolha) return;
+    setPeriodoConfirmado(periodoEmEscolha);
+    AsyncStorage.setItem(CHAVE_PERIODO_MAPA_CALOR, periodoEmEscolha).catch(() => {});
+    setPeriodoEmEscolha(null);
+  };
+
+  // Sem "Aplicar", a escolha é desfeita: no "Cancelar", ao desligar o mapa de calor,
+  // ao apertar o voltar do Android ou ao sair da aba.
+  useEffect(() => {
+    if (!mapaCalorAtivo) setPeriodoEmEscolha(null);
+  }, [mapaCalorAtivo]);
+
+  useEffect(() => {
+    if (!periodoEmEscolha) return undefined;
+    const inscricao = BackHandler.addEventListener('hardwareBackPress', () => {
+      setPeriodoEmEscolha(null);
+      return true;
+    });
+    return () => inscricao.remove();
+  }, [periodoEmEscolha]);
+
+  useFocusEffect(useCallback(() => () => setPeriodoEmEscolha(null), []));
 
   useEffect(() => {
     setEnderecoMonitorado(null);
@@ -351,6 +391,7 @@ export default function MapScreen() {
     const features = historicoAlertas
       .filter(item => statusEfetivo(item) !== 'rascunho')
       .filter(item => Number.isFinite(Number(item.latitude)) && Number.isFinite(Number(item.longitude)))
+      .filter(item => dentroDoPeriodo(item, periodoMapaCalor))
       .filter(item => {
         if (filtroAtivo === 'Todos') return true;
         const tipoNorm = normalizarTexto(item.tipo);
@@ -362,7 +403,7 @@ export default function MapScreen() {
         properties: { weight: 1 }
       }));
     return { type: 'FeatureCollection', features };
-  }, [historicoAlertas, filtroAtivo]);
+  }, [historicoAlertas, filtroAtivo, periodoMapaCalor]);
 
   const areasGeoJSON = useMemo(() => {
   const features = alertasFiltrados
@@ -690,8 +731,34 @@ export default function MapScreen() {
       )}
 
       {mapaCalorAtivo ? (
-        <View style={styles.heatmapLegend} pointerEvents="none">
+        <View style={styles.heatmapLegend} pointerEvents="box-none">
           <Text style={styles.heatmapLegendTitle}>Concentração histórica</Text>
+          <View style={styles.heatmapPeriodos} accessibilityRole="radiogroup" accessibilityLabel="Período do mapa de calor">
+            {PERIODOS_MAPA_CALOR.map(periodo => {
+              const ativo = periodoMapaCalor === periodo.id;
+              return (
+                <TouchableOpacity
+                  key={periodo.id}
+                  onPress={() => escolherPeriodo(periodo.id)}
+                  style={[styles.heatmapPeriodoChip, ativo && styles.heatmapPeriodoChipAtivo]}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: ativo }}
+                >
+                  <Text style={[styles.heatmapPeriodoTexto, ativo && styles.heatmapPeriodoTextoAtivo]}>{periodo.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          {periodoEmEscolha && (
+            <View style={styles.heatmapAcoes}>
+              <TouchableOpacity style={styles.heatmapCancelar} onPress={() => setPeriodoEmEscolha(null)} accessibilityLabel="Cancelar período">
+                <Text style={styles.heatmapCancelarTexto}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.heatmapAplicar} onPress={aplicarPeriodo} accessibilityLabel="Aplicar período">
+                <Text style={styles.heatmapAplicarTexto}>Aplicar</Text>
+              </TouchableOpacity>
+            </View>
+          )}
           <View style={styles.heatmapGradient}>
             {['#2b83ba', '#abdda4', '#ffffbf', '#fdae61', '#d7191c'].map(cor => (
               <View key={cor} style={[styles.heatmapColor, { backgroundColor: cor }]} />
