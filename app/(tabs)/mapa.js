@@ -18,7 +18,7 @@ import { GRAVIDADES, RAIOS_ALERTA, dadosGravidade, formatarRaio, orientacaoDoRis
 import { buscarClimaAtual } from '../../services/weatherService';
 import { uploadImage } from '../../services/imageUpload';
 import CameraCaptura from '../../components/camera-captura';
-import {ModalDeslizante, RolagemModal} from '../../components/modal-deslizante';
+import ModalDeslizante, { RolagemModal } from '../../components/modal-deslizante';
 import Icone, { IconeGravidade, IconeTipo } from '../../components/icone';
 import { apareceNoMapa, statusEfetivo, dentroDoPeriodo, periodoValido, PERIODOS_MAPA_CALOR, PERIODO_PADRAO_MAPA_CALOR } from '../../services/alertLifecycle';
 import { compartilharAlertaWhatsApp } from '../../services/shareAlert';
