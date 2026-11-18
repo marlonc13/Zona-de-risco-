@@ -1,7 +1,7 @@
 export const GRAVIDADES = [
-  { label: 'Atenção', cor: '#f9ab00', emoji: '🟡' },
-  { label: 'Alerta', cor: '#e8710a', emoji: '🟠' },
-  { label: 'Emergência', cor: '#d93025', emoji: '🔴' },
+  { label: 'Atenção', cor: '#f9ab00' },
+  { label: 'Alerta', cor: '#e8710a' },
+  { label: 'Emergência', cor: '#d93025' },
 ];
 
 export const RAIOS_ALERTA = [

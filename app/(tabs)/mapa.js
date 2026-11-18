@@ -19,6 +19,7 @@ import { buscarClimaAtual } from '../../services/weatherService';
 import { uploadImage } from '../../services/imageUpload';
 import CameraCaptura from '../../components/camera-captura';
 import ModalDeslizante from '../../components/modal-deslizante';
+import Icone, { IconeGravidade, IconeTipo } from '../../components/icone';
 import { apareceNoMapa, statusEfetivo, dentroDoPeriodo, periodoValido, PERIODOS_MAPA_CALOR, PERIODO_PADRAO_MAPA_CALOR } from '../../services/alertLifecycle';
 import { compartilharAlertaWhatsApp } from '../../services/shareAlert';
 
@@ -50,19 +51,13 @@ const CHAVE_ULTIMA_LOCALIZACAO = 'ultimaLocalizacaoMapa';
 const CHAVE_PERIODO_MAPA_CALOR = 'periodoMapaCalor';
 
 const TIPOS_ALERTA = [
-  { label: 'Todos', emoji: '🗺️', renderIcon: (color) => <Entypo name="map" size={18} color={color} />, cor: '#1a73e8' },
-  { label: 'Alagamento', emoji: '🌊', renderIcon: (color) => <MaterialCommunityIcons name="water" size={18} color={color} />, cor: '#1a73e8' },
-  { label: 'Enchente', emoji: '🌧️', renderIcon: (color) => <Ionicons name="rainy" size={18} color={color} />, cor: '#0b57d0' },
-  { label: 'Deslizamento', emoji: '⛰️', renderIcon: (color) => <FontAwesome5 name="mountain" size={18} color={color} />, cor: '#e8710a' },
-  { label: 'Vendaval', emoji: '💨', renderIcon: (color) => <Feather name="wind" size={18} color={color} />, cor: '#7b1fa2' },
-  { label: 'Incêndio florestal', emoji: '🔥', renderIcon: (color) => <MaterialCommunityIcons name="fire" size={18} color={color} />, cor: '#d93025' },
+  { label: 'Todos', renderIcon: (color) => <Entypo name="map" size={18} color={color} />, cor: '#1a73e8' },
+  { label: 'Alagamento', renderIcon: (color) => <MaterialCommunityIcons name="water" size={18} color={color} />, cor: '#1a73e8' },
+  { label: 'Enchente', renderIcon: (color) => <Ionicons name="rainy" size={18} color={color} />, cor: '#0b57d0' },
+  { label: 'Deslizamento', renderIcon: (color) => <FontAwesome5 name="mountain" size={18} color={color} />, cor: '#e8710a' },
+  { label: 'Vendaval', renderIcon: (color) => <Feather name="wind" size={18} color={color} />, cor: '#7b1fa2' },
+  { label: 'Incêndio florestal', renderIcon: (color) => <MaterialCommunityIcons name="fire" size={18} color={color} />, cor: '#d93025' },
 ];
-
-const emojiDoTipo = (tipo) => {
-  if (!tipo) return '⚠️';
-  const encontrado = TIPOS_ALERTA.find(t => t.label.toLowerCase().includes(tipo.toLowerCase()) || tipo.toLowerCase().includes(t.label.toLowerCase()));
-  return encontrado?.emoji || '⚠️';
-};
 
 // Distância entre a barra "Zona de Risco" e os filtros de tipo
 const ESPACO_FILTROS = 22;
@@ -428,8 +423,9 @@ export default function MapScreen() {
     return true;
   };
 
+  // Toque no mapa: só o administrador cria ocorrência; para os demais, nada acontece
   const abrirModalMarcacao = evento => {
-    if (!exigirLogin()) return;
+    if (!administrador) return;
     const [lon, lat] = evento.geometry.coordinates;
     const coords = { latitude: lat, longitude: lon };
     setCoordenadaSelecionada(coords);
@@ -623,9 +619,9 @@ export default function MapScreen() {
             <View style={{ width: 22, height: 22, backgroundColor: dadosGravidade(item.gravidade).cor, borderRadius: 11, borderWidth: 2, borderColor: '#fff' }} />
             <Mapbox.Callout>
               <TouchableOpacity style={styles.callout} onPress={() => router.push(`/ocorrencia/${item.id}`)}>
-                <Text style={styles.calloutTitle}>{emojiDoTipo(item.tipo)} {item.tipo}</Text>
-                <Text style={item.oficial === true ? styles.officialBadge : styles.previousBadge}>{item.oficial === true ? '✓ ALERTA OFICIAL' : 'REGISTRO ANTERIOR'}</Text>
-                <Text style={[styles.severityText, { color: dadosGravidade(item.gravidade).cor }]}>{dadosGravidade(item.gravidade).emoji} {item.gravidade || 'Atenção'} · Área de {formatarRaio(item.raioMetros)}</Text>
+                <Text style={styles.calloutTitle}><IconeTipo tipo={item.tipo} color={cores.tint} /> {item.tipo}</Text>
+                <Text style={item.oficial === true ? styles.officialBadge : styles.previousBadge}>{item.oficial === true ? <><Icone nome="check" size={11} /> ALERTA OFICIAL</> : 'REGISTRO ANTERIOR'}</Text>
+                <Text style={[styles.severityText, { color: dadosGravidade(item.gravidade).cor }]}><IconeGravidade label={item.gravidade || 'Atenção'} /> {item.gravidade || 'Atenção'} · Área de {formatarRaio(item.raioMetros)}</Text>
                 <Text style={styles.calloutText}>{item.comentario}</Text>
                 {item.fotoUrl && <Image source={{ uri: item.fotoUrl }} style={styles.calloutImage} />}
                 <Text style={styles.guidanceTitle}>Como se proteger</Text>
@@ -708,7 +704,7 @@ export default function MapScreen() {
         <View style={[styles.avisosTopo, { top: (fimFiltros ?? 172) + 8 }]} pointerEvents="box-none">
           {alertaEmergencia && (
             <TouchableOpacity style={styles.emergencyBanner} onPress={() => setModalEmergenciaVisivel(true)}>
-              <Text style={styles.emergencyBannerTitle}>🔴 EMERGÊNCIA NA SUA ÁREA</Text>
+              <Text style={styles.emergencyBannerTitle}><Icone nome="emergencia" size={15} /> EMERGÊNCIA NA SUA ÁREA</Text>
               <Text style={styles.emergencyBannerText}>{alertaEmergencia.tipo}: toque para ver as instruções de evacuação</Text>
             </TouchableOpacity>
           )}
@@ -720,11 +716,11 @@ export default function MapScreen() {
                 cameraRef.current?.setCamera({ centerCoordinate: [alerta.longitude, alerta.latitude], zoomLevel: ZOOM_USUARIO, animationDuration: 700 });
               }}
             >
-              <Text style={styles.homeWarningText}>🏠 {alertasPertoCasa.length} alerta(s) na área da sua residência</Text>
+              <Text style={styles.homeWarningText}><Icone nome="casa" size={14} /> {alertasPertoCasa.length} alerta(s) na área da sua residência</Text>
             </TouchableOpacity>
           ) : alertasPertoFamilia.length > 0 && (
             <TouchableOpacity style={styles.familyWarning} onPress={() => router.push('/familiares')}>
-              <Text style={styles.familyWarningText}>👥 {alertasPertoFamilia.length} alerta(s) perto de pessoas acompanhadas</Text>
+              <Text style={styles.familyWarningText}><Icone nome="pessoas" size={14} /> {alertasPertoFamilia.length} alerta(s) perto de pessoas acompanhadas</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -772,7 +768,7 @@ export default function MapScreen() {
         </View>
       ) : clima && (
         <View style={styles.weatherBox} pointerEvents="none">
-          <Text style={styles.weatherTitle}>🌤️ {clima.descricao} · {Math.round(clima.temperatura)}°C</Text>
+          <Text style={styles.weatherTitle}><Icone nome="clima" size={14} /> {clima.descricao} · {Math.round(clima.temperatura)}°C</Text>
           <Text style={styles.weatherText}>Chuva {clima.chuva ?? 0} mm · Vento {Math.round(clima.vento ?? 0)} km/h</Text>
           <Text style={styles.weatherSource}>Open-Meteo · dados auxiliares</Text>
         </View>
@@ -784,8 +780,8 @@ export default function MapScreen() {
             <Text style={styles.shareAlertTitle}>{alertaSelecionado.tipo}</Text>
             <Text style={styles.shareAlertSubtitle}>{alertaSelecionado.bairro || alertaSelecionado.gravidade}</Text>
           </View>
-          <TouchableOpacity style={styles.mapWhatsAppButton} onPress={() => compartilharAlertaWhatsApp(alertaSelecionado)}><Text style={styles.mapWhatsAppText}>💬 WhatsApp</Text></TouchableOpacity>
-          <TouchableOpacity style={styles.shareAlertClose} onPress={() => setAlertaSelecionado(null)}><Text style={styles.shareAlertCloseText}>✕</Text></TouchableOpacity>
+          <TouchableOpacity style={styles.mapWhatsAppButton} onPress={() => compartilharAlertaWhatsApp(alertaSelecionado)}><Text style={styles.mapWhatsAppText}><Icone nome="whatsapp" size={14} /> WhatsApp</Text></TouchableOpacity>
+          <TouchableOpacity style={styles.shareAlertClose} onPress={() => setAlertaSelecionado(null)}><Icone nome="fechar" size={16} color={cores.textMuted} escalavel={false} /></TouchableOpacity>
         </View>
       )}
 
@@ -818,15 +814,14 @@ export default function MapScreen() {
           />
         )}
       >
-              <ScrollView
+              <RolagemModal
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
-                contentContainerStyle={{ paddingBottom: 20 }}
               >
               <View style={styles.dragIndicator} />
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                 <Text style={styles.modalTitle}>Nova ocorrência</Text>
-                <TouchableOpacity onPress={() => setModalVisivel(false)} style={styles.closeButtonMini}><Text escalavel={false} style={{ fontSize: 16, fontWeight: 'bold', color: cores.text }}>✕</Text></TouchableOpacity>
+                <TouchableOpacity onPress={() => setModalVisivel(false)} style={styles.closeButtonMini}><Icone nome="fechar" size={18} color={cores.text} escalavel={false} /></TouchableOpacity>
               </View>
 
               <Text style={styles.sectionLabel}>Selecione o tipo:</Text>
@@ -843,7 +838,7 @@ export default function MapScreen() {
               <View style={styles.optionRow}>
                 {GRAVIDADES.map(item => (
                   <TouchableOpacity key={item.label} onPress={() => setGravidadeSelecionada(item.label)} style={[styles.optionChip, gravidadeSelecionada === item.label && { backgroundColor: item.cor }]}>
-                    <Text style={[styles.optionText, gravidadeSelecionada === item.label && styles.optionTextActive]}>{item.emoji} {item.label}</Text>
+                    <Text style={[styles.optionText, gravidadeSelecionada === item.label && styles.optionTextActive]}><IconeGravidade label={item.label} color={gravidadeSelecionada === item.label ? undefined : item.cor} /> {item.label}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -858,13 +853,13 @@ export default function MapScreen() {
               </View>
 
               <View style={styles.guidanceBox}>
-                <Text style={styles.guidanceTitle}>🛡️ Orientação que será exibida</Text>
+                <Text style={styles.guidanceTitle}><Icone nome="escudo" size={15} /> Orientação que será exibida</Text>
                 <Text style={styles.guidanceText}>{orientacaoDoRisco(tipoSelecionado)}</Text>
               </View>
 
               {gravidadeSelecionada === 'Emergência' && (
                 <View style={styles.emergencyAdminNotice}>
-                  <Text style={styles.emergencyAdminTitle}>🔴 Este alerta acionará o modo de emergência</Text>
+                  <Text style={styles.emergencyAdminTitle}><Icone nome="emergencia" size={15} /> Este alerta acionará o modo de emergência</Text>
                   <Text style={styles.emergencyAdminText}>Usuários dentro da área receberão instruções de evacuação, checklist e telefones de emergência.</Text>
                 </View>
               )}
@@ -872,7 +867,7 @@ export default function MapScreen() {
               <Text style={styles.sectionLabel}>Tempo de permanência no mapa:</Text>
               <View style={styles.tempoRow}>
                 <TouchableOpacity onPress={() => setTempoSelecionado(null)} style={[styles.tempoChipOpcao, tempoSelecionado === null && styles.tempoChipAtivo]}>
-                  <Text style={[styles.tempoTextoOpcao, tempoSelecionado === null && styles.tempoTextoAtivo]}>⚡ Automático ({foto ? '1h' : '30min'})</Text>
+                  <Text style={[styles.tempoTextoOpcao, tempoSelecionado === null && styles.tempoTextoAtivo]}><Icone nome="raio" size={13} /> Automático ({foto ? '1h' : '30min'})</Text>
                 </TouchableOpacity>
                 {OPCOES_TEMPO.map(opcao => (
                   <TouchableOpacity key={opcao.label} onPress={() => setTempoSelecionado(opcao.valor)} style={[styles.tempoChipOpcao, tempoSelecionado === opcao.valor && styles.tempoChipAtivo]}>
@@ -886,8 +881,8 @@ export default function MapScreen() {
               {foto && <Image source={{ uri: foto }} style={styles.preview} />}
 
               <View style={styles.photoRow}>
-                <TouchableOpacity style={styles.photoButton} onPress={tirarFoto}><Text style={styles.photoText}>📷 Tirar foto</Text></TouchableOpacity>
-                <TouchableOpacity style={styles.photoButton} onPress={escolherFoto}><Text style={styles.photoText}>🖼️ Galeria</Text></TouchableOpacity>
+                <TouchableOpacity style={styles.photoButton} onPress={tirarFoto}><Text style={styles.photoText}><Icone nome="camera" size={15} /> Tirar foto</Text></TouchableOpacity>
+                <TouchableOpacity style={styles.photoButton} onPress={escolherFoto}><Text style={styles.photoText}><Icone nome="galeria" size={15} /> Galeria</Text></TouchableOpacity>
               </View>
 
               <View style={styles.modalButtons}>
@@ -895,7 +890,7 @@ export default function MapScreen() {
                 <TouchableOpacity style={[styles.modalButton, styles.draftButton]} onPress={() => salvarMarcacao('rascunho')} disabled={salvando}><Text style={styles.draftText}>Salvar rascunho</Text></TouchableOpacity>
                 <TouchableOpacity style={[styles.modalButton, styles.saveButton]} onPress={() => salvarMarcacao('ativo')} disabled={salvando}><Text style={styles.saveText}>{salvando ? 'Salvando...' : 'Publicar'}</Text></TouchableOpacity>
               </View>
-              </ScrollView>
+              </RolagemModal>
       </ModalDeslizante>
 
       {/* Modal de Contatos de Emergência (SOS) */}
@@ -905,12 +900,12 @@ export default function MapScreen() {
         estiloFundo={styles.modalOverlay}
         estiloPainel={styles.modalBox}
       >
-            <ScrollView showsVerticalScrollIndicator={false}>
+            <RolagemModal showsVerticalScrollIndicator={false}>
               <View style={styles.dragIndicator} />
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}>
                 <Text style={styles.modalTitle}>Contatos de Emergência (SOS)</Text>
                 <TouchableOpacity onPress={fecharContatos} style={styles.closeButtonMini}>
-                  <Text escalavel={false} style={{ fontSize: 16, fontWeight: 'bold', color: cores.text }}>✕</Text>
+                  <Icone nome="fechar" size={18} color={cores.text} escalavel={false} />
                 </TouchableOpacity>
               </View>
 
@@ -922,21 +917,21 @@ export default function MapScreen() {
                 style={[styles.modalButton, { backgroundColor: cores.dangerButton, marginBottom: 10, padding: 12, borderRadius: 8 }]} 
                 onPress={() => Linking.openURL('tel:193')}
               >
-                <Text style={{ color: cores.onButton, fontWeight: 'bold', textAlign: 'center' }}>🚨 Bombeiros: 193</Text>
+                <Text style={{ color: cores.onButton, fontWeight: 'bold', textAlign: 'center' }}><Icone nome="bombeiros" size={16} /> Bombeiros: 193</Text>
               </TouchableOpacity>
 
               <TouchableOpacity 
                 style={[styles.modalButton, { backgroundColor: cores.button, marginBottom: 10, padding: 12, borderRadius: 8 }]} 
                 onPress={() => Linking.openURL('tel:199')}
               >
-                <Text style={{ color: cores.onButton, fontWeight: 'bold', textAlign: 'center' }}>🛡️ Defesa Civil: 199</Text>
+                <Text style={{ color: cores.onButton, fontWeight: 'bold', textAlign: 'center' }}><Icone nome="escudo" size={16} /> Defesa Civil: 199</Text>
               </TouchableOpacity>
 
               <TouchableOpacity 
                 style={[styles.modalButton, { backgroundColor: '#34a853', marginBottom: 20, padding: 12, borderRadius: 8 }]} 
                 onPress={() => Linking.openURL('tel:190')}
               >
-                <Text style={{ color: cores.onButton, fontWeight: 'bold', textAlign: 'center' }}>👮 Polícia: 190</Text>
+                <Text style={{ color: cores.onButton, fontWeight: 'bold', textAlign: 'center' }}><Icone nome="policia" size={16} /> Polícia: 190</Text>
               </TouchableOpacity>
 
               <TouchableOpacity 
@@ -945,7 +940,7 @@ export default function MapScreen() {
               >
                 <Text style={styles.cancelText}>Fechar</Text>
               </TouchableOpacity>
-            </ScrollView>
+            </RolagemModal>
       </ModalDeslizante>
 
       {/* Modal de Alerta de Emergência Automático (Orientações, Checklist e Contactos) */}
@@ -955,16 +950,16 @@ export default function MapScreen() {
         estiloFundo={styles.modalOverlay}
         estiloPainel={styles.modalBox}
       >
-            <ScrollView showsVerticalScrollIndicator={false}>
+            <RolagemModal showsVerticalScrollIndicator={false}>
               <View style={styles.dragIndicator} />
               
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                 <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
-                  <Text style={{ fontSize: 24, marginRight: 8 }}>🔴</Text>
+                  <Icone nome="emergencia" size={24} color={cores.danger} style={{ marginRight: 8 }} />
                   <Text style={[styles.modalTitle, { color: cores.danger }]}>Alerta de emergência</Text>
                 </View>
                 <TouchableOpacity onPress={() => setModalEmergenciaVisivel(false)} style={styles.closeButtonMini}>
-                  <Text escalavel={false} style={{ fontSize: 16, fontWeight: 'bold', color: cores.text }}>✕</Text>
+                  <Icone nome="fechar" size={18} color={cores.text} escalavel={false} />
                 </TouchableOpacity>
               </View>
 
@@ -1038,7 +1033,7 @@ export default function MapScreen() {
                 'Itens essenciais para crianças, idosos e animais'
               ].map((item, idx) => (
                 <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-                  <Text style={{ fontSize: 16, marginRight: 8, color: cores.text }}>☐</Text>
+                  <Icone nome="checkbox" size={18} color={cores.text} style={{ marginRight: 8 }} />
                   <Text style={{ flex: 1, fontSize: 14, color: cores.textSecondary }}>{item}</Text>
                 </View>
               ))}
@@ -1051,7 +1046,7 @@ export default function MapScreen() {
                 style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: cores.surfaceSubtle, padding: 12, borderRadius: 8, marginBottom: 8 }}
                 onPress={() => Linking.openURL('tel:199')}
               >
-                <Text style={{ fontSize: 14, fontWeight: 'bold', color: cores.textStrong }}>🛡️ Defesa Civil</Text>
+                <Text style={{ fontSize: 14, fontWeight: 'bold', color: cores.textStrong }}><Icone nome="escudo" size={15} /> Defesa Civil</Text>
                 <Text style={{ fontSize: 14, fontWeight: 'bold', color: cores.danger }}>Ligar 199</Text>
               </TouchableOpacity>
 
@@ -1059,7 +1054,7 @@ export default function MapScreen() {
                 style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: cores.surfaceSubtle, padding: 12, borderRadius: 8, marginBottom: 8 }}
                 onPress={() => Linking.openURL('tel:193')}
               >
-                <Text style={{ fontSize: 14, fontWeight: 'bold', color: cores.textStrong }}>🚒 Bombeiros</Text>
+                <Text style={{ fontSize: 14, fontWeight: 'bold', color: cores.textStrong }}><Icone nome="bombeiros" size={15} /> Bombeiros</Text>
                 <Text style={{ fontSize: 14, fontWeight: 'bold', color: cores.danger }}>Ligar 193</Text>
               </TouchableOpacity>
 
@@ -1067,13 +1062,13 @@ export default function MapScreen() {
                 style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: cores.surfaceSubtle, padding: 12, borderRadius: 8, marginBottom: 12 }}
                 onPress={() => Linking.openURL('tel:192')}
               >
-                <Text style={{ fontSize: 14, fontWeight: 'bold', color: cores.textStrong }}>🚑 SAMU</Text>
+                <Text style={{ fontSize: 14, fontWeight: 'bold', color: cores.textStrong }}><Icone nome="ambulancia" size={15} /> SAMU</Text>
                 <Text style={{ fontSize: 14, fontWeight: 'bold', color: cores.danger }}>Ligar 192</Text>
               </TouchableOpacity>
 
               <View style={{ backgroundColor: cores.tintBackground, padding: 12, borderRadius: 8, marginBottom: 16 }}>
                 <Text style={{ fontSize: 12, color: cores.tint }}>
-                  📲 Estas instruções ficam disponíveis no aplicativo mesmo sem internet.
+                  <Icone nome="celular" size={13} /> Estas instruções ficam disponíveis no aplicativo mesmo sem internet.
                 </Text>
               </View>
 
@@ -1085,10 +1080,10 @@ export default function MapScreen() {
                 }}
               >
                 <Text style={{ color: cores.onButton, fontWeight: 'bold', textAlign: 'center', fontSize: 15 }}>
-                  🏠 Ver abrigos e pontos seguros
+                  <Icone nome="casa" size={15} /> Ver abrigos e pontos seguros
                 </Text>
               </TouchableOpacity>
-            </ScrollView>
+            </RolagemModal>
       </ModalDeslizante>
 
     </View>

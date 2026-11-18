@@ -20,7 +20,6 @@ export default criarEstilos((c, tema) => {
     passwordBox: { width: '100%', backgroundColor: c.surface, borderRadius: 14, marginBottom: 12, borderWidth: 1, borderColor: c.border, flexDirection: 'row', alignItems: 'center' },
     passwordInput: { flex: 1, paddingVertical: 14, paddingHorizontal: 14, color: c.textStrong },
     eyeButton: { paddingHorizontal: 13, paddingVertical: 10 },
-    eyeText: { fontSize: 18 },
     button: { width: '100%', backgroundColor: c.button, paddingVertical: 15, borderRadius: 15, alignItems: 'center', marginTop: 4 },
     buttonText: { color: c.onButton, fontSize: 16, fontWeight: '800' },
     linkButton: { marginTop: 15, padding: 8 },
