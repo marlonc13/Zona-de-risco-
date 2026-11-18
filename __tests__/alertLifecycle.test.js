@@ -1,4 +1,4 @@
-import { apareceNoMapa, dadosStatus, proximoStatus, statusEfetivo } from '../services/alertLifecycle';
+import { apareceNoMapa, dadosStatus, dentroDoPeriodo, momentoDaOcorrencia, periodoValido, proximoStatus, statusEfetivo } from '../services/alertLifecycle';
 
 // Data fixa para que "expirado" e "no futuro" não dependam do relógio da máquina
 const AGORA = new Date('2026-01-10T12:00:00Z').getTime();
@@ -89,5 +89,64 @@ describe('dadosStatus', () => {
 
   it('usa "ativo" quando o status não existe', () => {
     expect(dadosStatus('invalido').id).toBe('ativo');
+  });
+});
+
+describe('momentoDaOcorrencia', () => {
+  it('usa createdAtMillis quando existe', () => {
+    expect(momentoDaOcorrencia({ createdAtMillis: noPassado })).toBe(noPassado);
+  });
+
+  it('cai para o Timestamp do Firestore em registros antigos', () => {
+    expect(momentoDaOcorrencia({ createdAt: { toMillis: () => noPassado } })).toBe(noPassado);
+    expect(momentoDaOcorrencia({ createdAt: new Date(noPassado) })).toBe(noPassado);
+  });
+
+  it('devolve null quando a ocorrência não tem data', () => {
+    expect(momentoDaOcorrencia({})).toBeNull();
+    expect(momentoDaOcorrencia({ createdAt: 'agora' })).toBeNull();
+  });
+});
+
+describe('dentroDoPeriodo', () => {
+  const UM_DIA = 24 * UMA_HORA;
+  const ha = dias => ({ createdAtMillis: AGORA - dias * UM_DIA });
+
+  it('"Tudo" aceita qualquer ocorrência, até sem data', () => {
+    expect(dentroDoPeriodo(ha(400), 'tudo')).toBe(true);
+    expect(dentroDoPeriodo({}, 'tudo')).toBe(true);
+  });
+
+  it('"Última semana" aceita até 7 dias atrás', () => {
+    expect(dentroDoPeriodo(ha(7), 'semana')).toBe(true);
+    expect(dentroDoPeriodo(ha(8), 'semana')).toBe(false);
+  });
+
+  it('"Último mês" aceita até 30 dias atrás', () => {
+    expect(dentroDoPeriodo(ha(30), 'mes')).toBe(true);
+    expect(dentroDoPeriodo(ha(31), 'mes')).toBe(false);
+  });
+
+  it('"Últimas 24 horas" aceita até 1 dia atrás', () => {
+    expect(dentroDoPeriodo(ha(1), '24h')).toBe(true);
+    expect(dentroDoPeriodo({ createdAtMillis: AGORA - 25 * UMA_HORA }, '24h')).toBe(false);
+  });
+
+  it('ocorrência sem data fica fora dos períodos com limite', () => {
+    expect(dentroDoPeriodo({}, 'semana')).toBe(false);
+    expect(dentroDoPeriodo({}, 'mes')).toBe(false);
+  });
+
+  it('filtra registros antigos pelo createdAt do Firestore', () => {
+    const antigo = { createdAt: { toMillis: () => AGORA - 3 * UM_DIA } };
+    expect(dentroDoPeriodo(antigo, 'semana')).toBe(true);
+  });
+});
+
+describe('periodoValido', () => {
+  it('reconhece só os períodos oferecidos', () => {
+    for (const id of ['tudo', 'mes', 'semana', '24h']) expect(periodoValido(id)).toBe(true);
+    expect(periodoValido('ano')).toBe(false);
+    expect(periodoValido(null)).toBe(false);
   });
 });

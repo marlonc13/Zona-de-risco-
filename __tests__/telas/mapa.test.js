@@ -1,12 +1,18 @@
-import { Alert } from 'react-native';
+import { Alert, BackHandler } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react-native';
-import { addDoc } from 'firebase/firestore';
+import { addDoc, onSnapshot } from 'firebase/firestore';
 import MapScreen from '../../app/(tabs)/mapa';
 
 const mockRouter = { push: jest.fn(), replace: jest.fn() };
 const mockUsuario = { uid: 'uid-admin', email: 'admin@exemplo.com', displayName: 'Admin' };
 
-jest.mock('expo-router', () => ({ useRouter: () => mockRouter, useLocalSearchParams: () => ({}) }));
+// useFocusEffect vira um efeito comum: a tela "perde o foco" quando é desmontada
+jest.mock('expo-router', () => ({
+  useRouter: () => mockRouter,
+  useLocalSearchParams: () => ({}),
+  useFocusEffect: efeito => require('react').useEffect(efeito, [efeito]),
+}));
 jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock').default);
 jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock'));
@@ -120,4 +126,144 @@ it('não publica sem descrição', async () => {
   await act(async () => { fireEvent.press(screen.getByText('Publicar')); });
   expect(addDoc).not.toHaveBeenCalled();
   expect(Alert.alert).toHaveBeenCalledWith('Aviso', 'Escreva uma breve descrição do problema.');
+});
+
+describe('mapa de calor', () => {
+  const UM_DIA = 24 * 60 * 60 * 1000;
+  const ocorrencia = (id, dias, extra = {}) => ({
+    id,
+    data: () => ({ tipo: 'Alagamento', latitude: -23.5, longitude: -46.6, status: 'encerrado', createdAtMillis: Date.now() - dias * UM_DIA, ...extra }),
+  });
+  const historico = [
+    ocorrencia('a', 2),
+    ocorrencia('b', 20),
+    ocorrencia('c', 200),
+    ocorrencia('d', 3, { tipo: 'Deslizamento' }),
+    ocorrencia('e', 1, { status: 'rascunho' }),
+    ocorrencia('f', 0.5),
+  ];
+  const contador = total => screen.getByText(`${total} ocorrência(s) analisada(s)`);
+
+  beforeEach(async () => {
+    await AsyncStorage.clear();
+    onSnapshot.mockImplementation((ref, callback) => {
+      callback({ docs: ref === 'marcacoes' ? historico : [], data: () => undefined });
+      return jest.fn();
+    });
+  });
+
+  async function abrirMapaDeCalor() {
+    const tela = render(<MapScreen />);
+    fireEvent.press(await screen.findByLabelText('Mapa de calor'));
+    return tela;
+  }
+
+  function capturarVoltar() {
+    const handlers = [];
+    jest.spyOn(BackHandler, 'addEventListener').mockImplementation((_evento, handler) => {
+      handlers.push(handler);
+      return { remove: () => handlers.splice(handlers.indexOf(handler), 1) };
+    });
+    return () => handlers.at(-1)?.();
+  }
+
+  it('só mostra os períodos com o mapa de calor ligado', async () => {
+    render(<MapScreen />);
+    await screen.findByLabelText('Mapa de calor');
+    expect(screen.queryByText('Último mês')).toBeNull();
+    fireEvent.press(screen.getByLabelText('Mapa de calor'));
+    for (const periodo of ['Tudo', 'Último mês', 'Última semana', 'Últimas 24 horas']) {
+      expect(screen.getByText(periodo)).toBeTruthy();
+    }
+  });
+
+  it('começa no último mês, ignora rascunhos e não pede confirmação', async () => {
+    await abrirMapaDeCalor();
+    expect(contador(4)).toBeTruthy();
+    expect(screen.queryByText('Aplicar')).toBeNull();
+  });
+
+  it('mostra a prévia de cada período antes da confirmação', async () => {
+    await abrirMapaDeCalor();
+    fireEvent.press(screen.getByText('Últimas 24 horas'));
+    expect(contador(1)).toBeTruthy();
+    fireEvent.press(screen.getByText('Última semana'));
+    expect(contador(3)).toBeTruthy();
+    fireEvent.press(screen.getByText('Tudo'));
+    expect(contador(5)).toBeTruthy();
+    expect(screen.getByText('Aplicar')).toBeTruthy();
+  });
+
+  it('voltar a escolher o período em vigor dispensa a confirmação', async () => {
+    await abrirMapaDeCalor();
+    fireEvent.press(screen.getByText('Tudo'));
+    fireEvent.press(screen.getByText('Último mês'));
+    expect(screen.queryByText('Aplicar')).toBeNull();
+  });
+
+  it('combina o período com o filtro de tipo', async () => {
+    await abrirMapaDeCalor();
+    fireEvent.press(screen.getByText('Última semana'));
+    fireEvent.press(screen.getByText('Deslizamento'));
+    expect(contador(1)).toBeTruthy();
+  });
+
+  it('o voltar do Android desfaz a escolha não confirmada', async () => {
+    const apertarVoltar = capturarVoltar();
+    await abrirMapaDeCalor();
+    fireEvent.press(screen.getByText('Últimas 24 horas'));
+    let consumido;
+    act(() => { consumido = apertarVoltar(); });
+    expect(consumido).toBe(true);
+    expect(contador(4)).toBeTruthy();
+    expect(screen.queryByText('Aplicar')).toBeNull();
+    expect(AsyncStorage.setItem).not.toHaveBeenCalledWith('periodoMapaCalor', expect.anything());
+  });
+
+  it('sem escolha pendente, o voltar do Android segue o comportamento normal', async () => {
+    const apertarVoltar = capturarVoltar();
+    await abrirMapaDeCalor();
+    expect(apertarVoltar()).toBeUndefined();
+  });
+
+  it('o botão Cancelar desfaz a escolha não confirmada', async () => {
+    await abrirMapaDeCalor();
+    fireEvent.press(screen.getByText('Últimas 24 horas'));
+    expect(contador(1)).toBeTruthy();
+    fireEvent.press(screen.getByText('Cancelar'));
+    expect(contador(4)).toBeTruthy();
+    expect(screen.queryByText('Aplicar')).toBeNull();
+    expect(screen.queryByText('Cancelar')).toBeNull();
+    expect(AsyncStorage.setItem).not.toHaveBeenCalledWith('periodoMapaCalor', expect.anything());
+  });
+
+  it('desligar o mapa de calor desfaz a escolha não confirmada', async () => {
+    await abrirMapaDeCalor();
+    fireEvent.press(screen.getByText('Últimas 24 horas'));
+    fireEvent.press(screen.getByLabelText('Mapa de calor'));
+    fireEvent.press(screen.getByLabelText('Mapa de calor'));
+    expect(contador(4)).toBeTruthy();
+  });
+
+  it('sair da tela sem confirmar não salva a escolha', async () => {
+    const tela = await abrirMapaDeCalor();
+    fireEvent.press(screen.getByText('Tudo'));
+    tela.unmount();
+
+    await abrirMapaDeCalor();
+    expect(contador(4)).toBeTruthy();
+  });
+
+  it('o período confirmado é salvo e continua valendo ao reabrir', async () => {
+    const tela = await abrirMapaDeCalor();
+    fireEvent.press(screen.getByText('Última semana'));
+    fireEvent.press(screen.getByText('Aplicar'));
+    expect(contador(3)).toBeTruthy();
+    expect(screen.queryByText('Aplicar')).toBeNull();
+    expect(AsyncStorage.setItem).toHaveBeenCalledWith('periodoMapaCalor', 'semana');
+    tela.unmount();
+
+    await abrirMapaDeCalor();
+    await waitFor(() => expect(contador(3)).toBeTruthy());
+  });
 });
