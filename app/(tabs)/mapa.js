@@ -61,6 +61,8 @@ const TIPOS_ALERTA = [
 
 // Distância entre a barra "Zona de Risco" e os filtros de tipo
 const ESPACO_FILTROS = 22;
+// folga entre o painel de baixo (clima ou mapa de calor) e a caixa de compartilhar
+const ESPACO_PAINEL_INFERIOR = 8;
 
 const OPCOES_TEMPO = [
   { label: '30 Minutos', valor: 30 * 60 * 1000 },
@@ -148,6 +150,8 @@ export default function MapScreen() {
   // Fim da barra "Zona de Risco": os filtros ficam logo abaixo dela, mesmo com "Letras grandes"
   const [fimBarraSuperior, setFimBarraSuperior] = useState(null);
   const [fimFiltros, setFimFiltros] = useState(null);
+  // Altura do painel de baixo à esquerda: a caixa de compartilhar sobe junto com ele
+  const [alturaPainelInferior, setAlturaPainelInferior] = useState(0);
   const [centroInicial, setCentroInicial] = useState(null);
   const jaCentralizou = useRef(false);
   const usuarioMexeuNoMapa = useRef(false);
@@ -535,6 +539,13 @@ export default function MapScreen() {
     return nome.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
   }, [usuario]);
 
+  // A caixa de compartilhar fica logo acima do painel de baixo à esquerda (mapa de calor ou clima);
+  // sem painel, desce até a altura do botão de localização
+  const painelInferior = mapaCalorAtivo ? styles.heatmapLegend : clima ? styles.weatherBox : null;
+  const bottomCaixaCompartilhar = painelInferior && alturaPainelInferior
+    ? painelInferior.bottom + alturaPainelInferior + ESPACO_PAINEL_INFERIOR
+    : styles.locationButton.bottom;
+
   return (
     <View style={styles.container}>
       {!centroInicial ? (
@@ -727,7 +738,7 @@ export default function MapScreen() {
       )}
 
       {mapaCalorAtivo ? (
-        <View style={styles.heatmapLegend} pointerEvents="box-none">
+        <View style={styles.heatmapLegend} pointerEvents="box-none" onLayout={e => setAlturaPainelInferior(e.nativeEvent.layout.height)}>
           <Text style={styles.heatmapLegendTitle}>Concentração histórica</Text>
           <View style={styles.heatmapPeriodos} accessibilityRole="radiogroup" accessibilityLabel="Período do mapa de calor">
             {PERIODOS_MAPA_CALOR.map(periodo => {
@@ -767,7 +778,7 @@ export default function MapScreen() {
           <Text style={styles.heatmapCount}>{heatmapGeoJSON.features.length} ocorrência(s) analisada(s)</Text>
         </View>
       ) : clima && (
-        <View style={styles.weatherBox} pointerEvents="none">
+        <View style={styles.weatherBox} pointerEvents="none" onLayout={e => setAlturaPainelInferior(e.nativeEvent.layout.height)}>
           <Text style={styles.weatherTitle}><Icone nome="clima" size={14} /> {clima.descricao} · {Math.round(clima.temperatura)}°C</Text>
           <Text style={styles.weatherText}>Chuva {clima.chuva ?? 0} mm · Vento {Math.round(clima.vento ?? 0)} km/h</Text>
           <Text style={styles.weatherSource}>Open-Meteo · dados auxiliares</Text>
@@ -775,7 +786,7 @@ export default function MapScreen() {
       )}
 
       {alertaSelecionado && (
-        <View style={styles.shareAlertBox}>
+        <View style={[styles.shareAlertBox, { bottom: bottomCaixaCompartilhar }]}>
           <View style={styles.shareAlertInfo}>
             <Text style={styles.shareAlertTitle}>{alertaSelecionado.tipo}</Text>
             <Text style={styles.shareAlertSubtitle}>{alertaSelecionado.bairro || alertaSelecionado.gravidade}</Text>
@@ -805,7 +816,6 @@ export default function MapScreen() {
         onFechar={() => setModalVisivel(false)}
         estiloFundo={styles.modalOverlay}
         estiloPainel={styles.modalBox}
-        evitarTeclado
         sobreposto={(
           <CameraCaptura
             visivel={cameraVisivel}
