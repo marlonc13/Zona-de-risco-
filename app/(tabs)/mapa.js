@@ -60,9 +60,20 @@ const TIPOS_ALERTA = [
 ];
 
 // Distância entre a barra "Zona de Risco" e os filtros de tipo
-const ESPACO_FILTROS = 22;
+const ESPACO_FILTROS = 20;
 // folga entre o painel de baixo (clima ou mapa de calor) e a caixa de compartilhar
 const ESPACO_PAINEL_INFERIOR = 8;
+// Balão do alerta tocado: folga até os avisos do topo e distância da ponta da seta
+// até o centro do marcador (seta de 8 + metade do marcador de 22 + respiro)
+const ESPACO_BALAO = 10;
+const DISTANCIA_SETA_MARCADOR = 22;
+
+// Latitude que deve ficar no centro do mapa para o ponto aparecer `deslocamentoDp`
+// abaixo do centro da tela (no zoom do Mapbox, o mundo inteiro mede 512 dp no zoom 0)
+function latitudeComDeslocamento(latitude, deslocamentoDp, zoom) {
+  const metrosPorDp = 40075016.686 * Math.cos(latitude * Math.PI / 180) / (512 * 2 ** zoom);
+  return latitude + deslocamentoDp * metrosPorDp / 111320;
+}
 
 const OPCOES_TEMPO = [
   { label: '30 Minutos', valor: 30 * 60 * 1000 },
@@ -146,6 +157,13 @@ export default function MapScreen() {
   const [alertaEmergencia, setAlertaEmergencia] = useState(null);
   const [administrador, setAdministrador] = useState(false);
   const [alertaSelecionado, setAlertaSelecionado] = useState(null);
+  // Balão do alerta tocado: fica fora do mapa porque o Callout do Mapbox é desenhado
+  // dentro dele, por baixo do ponto da localização e dos outros marcadores
+  const [balao, setBalao] = useState(null);
+  const [alturaBalao, setAlturaBalao] = useState(null);
+  const [alturaTela, setAlturaTela] = useState(null);
+  const [fimAvisos, setFimAvisos] = useState(null);
+  const zoomAtual = useRef(ZOOM_USUARIO);
   const [modalContatosVisivel, setModalContatosVisivel] = useState(false);
   // Fim da barra "Zona de Risco": os filtros ficam logo abaixo dela, mesmo com "Letras grandes"
   const [fimBarraSuperior, setFimBarraSuperior] = useState(null);
@@ -342,6 +360,12 @@ export default function MapScreen() {
     if (!enderecoMonitorado) return [];
     return alertas.filter(alerta => distanciaKm(enderecoMonitorado, alerta) <= (alerta.raioMetros || 1000) / 1000);
   }, [alertas, enderecoMonitorado]);
+
+  // Com a faixa de emergência na tela, o aviso da residência só repete informação quando
+  // o único alerta perto de casa é a própria emergência da faixa — nesse caso ele é escondido
+  const avisoCasaRedundante = !!alertaEmergencia
+    && alertasPertoCasa.length > 0
+    && alertasPertoCasa.every(alerta => alerta.id === alertaEmergencia.id);
 
   const alertasPertoFamilia = useMemo(() => enderecosFamiliares.flatMap(endereco => alertas
     .filter(alerta => distanciaKm(endereco, alerta) <= (alerta.raioMetros || 1000) / 1000)
@@ -546,8 +570,37 @@ export default function MapScreen() {
     ? painelInferior.bottom + alturaPainelInferior + ESPACO_PAINEL_INFERIOR
     : styles.locationButton.bottom;
 
+  // O balão abre logo abaixo dos avisos do topo (ou dos filtros, sem avisos)
+  const avisosVisiveis = !!alertaEmergencia || alertasPertoCasa.length > 0 || alertasPertoFamilia.length > 0;
+  const topoBalao = (avisosVisiveis && fimAvisos !== null ? fimAvisos : (fimFiltros ?? 172)) + ESPACO_BALAO;
+
+  // Tocar no marcador abre o balão. O Android desmarca o marcador quando ele é tocado
+  // de novo, então o onDeselected também abre: assim o toque sempre mostra o balão
+  const selecionarAlerta = item => {
+    setAlertaSelecionado(item);
+    setAlturaBalao(null);
+    setBalao({ alerta: item, versao: Date.now() });
+  };
+  // A caixa do WhatsApp pertence ao alerta tocado: fecha junto com o balão
+  const fecharBalao = () => {
+    setBalao(null);
+    setAlertaSelecionado(null);
+  };
+
+  // Com o balão medido, a câmera leva o alerta para logo abaixo da ponta da seta,
+  // no meio da tela na horizontal — assim o balão nunca sai cortado pela borda
+  useEffect(() => {
+    if (!balao || !alturaBalao || !alturaTela) return;
+    const { alerta } = balao;
+    const alvoY = topoBalao + alturaBalao + DISTANCIA_SETA_MARCADOR;
+    cameraRef.current?.setCamera({
+      centerCoordinate: [alerta.longitude, latitudeComDeslocamento(alerta.latitude, alvoY - alturaTela / 2, zoomAtual.current)],
+      animationDuration: 600,
+    });
+  }, [balao, alturaBalao, alturaTela, topoBalao]);
+
   return (
-    <View style={styles.container}>
+    <View style={styles.container} onLayout={e => setAlturaTela(e.nativeEvent.layout.height)}>
       {!centroInicial ? (
         <View style={[styles.map, { alignItems: 'center', justifyContent: 'center' }]}>
           <ActivityIndicator size="large" color={cores.tint} />
@@ -557,13 +610,18 @@ export default function MapScreen() {
         style={styles.map}
         scaleBarEnabled={false}
         compassEnabled={false}
-        onPress={abrirModalMarcacao}
-        onLongPress={abrirModalMarcacao}
+        onPress={e => { fecharBalao(); abrirModalMarcacao(e); }}
+        onLongPress={e => { fecharBalao(); abrirModalMarcacao(e); }}
         logoEnabled={false}
         attributionEnabled={false}
         styleURL={estiloMapa}
         onCameraChanged={e => {
-          if (e.gestures?.isGestureActive) usuarioMexeuNoMapa.current = true;
+          if (typeof e.properties?.zoom === 'number') zoomAtual.current = e.properties.zoom;
+          if (e.gestures?.isGestureActive) {
+            usuarioMexeuNoMapa.current = true;
+            // o balão fica parado na tela: arrastando o mapa ele deixaria de apontar para o alerta
+            fecharBalao();
+          }
         }}
         onMapIdle={e => {
           const centro = e.properties?.center;
@@ -625,22 +683,10 @@ export default function MapScreen() {
             key={item.id}
             id={item.id}
             coordinate={[item.longitude, item.latitude]}
-            onSelected={() => setAlertaSelecionado(item)}
+            onSelected={() => selecionarAlerta(item)}
+            onDeselected={() => selecionarAlerta(item)}
           >
             <View style={{ width: 22, height: 22, backgroundColor: dadosGravidade(item.gravidade).cor, borderRadius: 11, borderWidth: 2, borderColor: '#fff' }} />
-            <Mapbox.Callout>
-              <TouchableOpacity style={styles.callout} onPress={() => router.push(`/ocorrencia/${item.id}`)}>
-                <Text style={styles.calloutTitle}><IconeTipo tipo={item.tipo} color={cores.tint} /> {item.tipo}</Text>
-                <Text style={item.oficial === true ? styles.officialBadge : styles.previousBadge}>{item.oficial === true ? <><Icone nome="check" size={11} /> ALERTA OFICIAL</> : 'REGISTRO ANTERIOR'}</Text>
-                <Text style={[styles.severityText, { color: dadosGravidade(item.gravidade).cor }]}><IconeGravidade label={item.gravidade || 'Atenção'} /> {item.gravidade || 'Atenção'} · Área de {formatarRaio(item.raioMetros)}</Text>
-                <Text style={styles.calloutText}>{item.comentario}</Text>
-                {item.fotoUrl && <Image source={{ uri: item.fotoUrl }} style={styles.calloutImage} />}
-                <Text style={styles.guidanceTitle}>Como se proteger</Text>
-                <Text style={styles.guidanceText}>{orientacaoDoRisco(item.tipo)}</Text>
-                <Text style={styles.calloutDate}>Publicado em {new Date(item.createdAtMillis || Date.now()).toLocaleString('pt-BR')}</Text>
-                <Text style={styles.calloutDetails}>Toque para ver todos os detalhes</Text>
-              </TouchableOpacity>
-            </Mapbox.Callout>
           </Mapbox.PointAnnotation>
         ))}
 
@@ -689,7 +735,7 @@ export default function MapScreen() {
         <TouchableOpacity style={styles.avatar} onPress={abrirPerfil}><Text style={styles.avatarText}>{iniciais}</Text></TouchableOpacity>
         <View style={{ flex: 1 }}><Text style={styles.searchTitle}>Zona de Risco</Text><Text style={styles.searchSub}>{administrador ? 'Modo administrador' : 'Alertas naturais próximos'}</Text></View>
         <TouchableOpacity style={styles.sosHeaderButton} accessibilityLabel="Contatos de emergência" onPress={() => setModalContatosVisivel(true)}><Text style={styles.sosHeaderText}>SOS</Text></TouchableOpacity>
-        <TouchableOpacity style={[styles.heatmapHeaderButton, mapaCalorAtivo && styles.heatmapHeaderButtonActive]} accessibilityLabel="Mapa de calor" onPress={() => setMapaCalorAtivo(atual => !atual)}>
+        <TouchableOpacity style={[styles.heatmapHeaderButton, mapaCalorAtivo && styles.heatmapHeaderButtonActive]} accessibilityLabel="Mapa de calor" onPress={() => { fecharBalao(); setMapaCalorAtivo(atual => !atual); }}>
           <MaterialCommunityIcons name="fire" size={24} color={cores.icon} />
           </TouchableOpacity>
       </View>
@@ -712,28 +758,56 @@ export default function MapScreen() {
       </ScrollView>
 
       {(alertaEmergencia || alertasPertoCasa.length > 0 || alertasPertoFamilia.length > 0) && (
-        <View style={[styles.avisosTopo, { top: (fimFiltros ?? 172) + 8 }]} pointerEvents="box-none">
+        <View
+          style={[styles.avisosTopo, { top: (fimFiltros ?? 172) + 8 }]}
+          pointerEvents="box-none"
+          onLayout={e => {
+            const { y, height } = e.nativeEvent.layout;
+            setFimAvisos(y + height);
+          }}
+        >
           {alertaEmergencia && (
             <TouchableOpacity style={styles.emergencyBanner} onPress={() => setModalEmergenciaVisivel(true)}>
-              <Text style={styles.emergencyBannerTitle}><Icone nome="emergencia" size={15} /> EMERGÊNCIA NA SUA ÁREA</Text>
-              <Text style={styles.emergencyBannerText}>{alertaEmergencia.tipo}: toque para ver as instruções de evacuação</Text>
+              <Text style={styles.emergencyBannerTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}><Icone nome="emergencia" size={15} /> EMERGÊNCIA NA SUA ÁREA</Text>
+              <Text style={styles.emergencyBannerText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{alertaEmergencia.tipo} · toque para ver como evacuar</Text>
             </TouchableOpacity>
           )}
-          {alertasPertoCasa.length > 0 ? (
+          {avisoCasaRedundante ? null : alertasPertoCasa.length > 0 ? (
             <TouchableOpacity
               style={styles.homeWarning}
               onPress={() => {
                 const alerta = alertasPertoCasa[0];
+                fecharBalao();
                 cameraRef.current?.setCamera({ centerCoordinate: [alerta.longitude, alerta.latitude], zoomLevel: ZOOM_USUARIO, animationDuration: 700 });
               }}
             >
-              <Text style={styles.homeWarningText}><Icone nome="casa" size={14} /> {alertasPertoCasa.length} alerta(s) na área da sua residência</Text>
+              <Text style={styles.homeWarningText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}><Icone nome="casa" size={14} /> {alertasPertoCasa.length} alerta(s) na área da sua residência</Text>
             </TouchableOpacity>
           ) : alertasPertoFamilia.length > 0 && (
             <TouchableOpacity style={styles.familyWarning} onPress={() => router.push('/familiares')}>
-              <Text style={styles.familyWarningText}><Icone nome="pessoas" size={14} /> {alertasPertoFamilia.length} alerta(s) perto de pessoas acompanhadas</Text>
+              <Text style={styles.familyWarningText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}><Icone nome="pessoas" size={14} /> {alertasPertoFamilia.length} alerta(s) perto de pessoas acompanhadas</Text>
             </TouchableOpacity>
           )}
+        </View>
+      )}
+
+      {balao && !mapaCalorAtivo && (
+        <View style={[styles.balaoAlerta, { top: topoBalao }]} pointerEvents="box-none">
+          <TouchableOpacity
+            style={styles.callout}
+            activeOpacity={0.85}
+            onLayout={e => setAlturaBalao(e.nativeEvent.layout.height)}
+            onPress={() => { fecharBalao(); router.push(`/ocorrencia/${balao.alerta.id}`); }}
+          >
+            <Text style={styles.calloutTitle}><IconeTipo tipo={balao.alerta.tipo} color={cores.tint} /> {balao.alerta.tipo}</Text>
+            <Text style={balao.alerta.oficial === true ? styles.officialBadge : styles.previousBadge}>{balao.alerta.oficial === true ? <><Icone nome="check" size={11} /> ALERTA OFICIAL</> : 'REGISTRO ANTERIOR'}</Text>
+            <Text style={[styles.severityText, { color: dadosGravidade(balao.alerta.gravidade).cor }]}><IconeGravidade label={balao.alerta.gravidade || 'Atenção'} /> {balao.alerta.gravidade || 'Atenção'} · Área de {formatarRaio(balao.alerta.raioMetros)}</Text>
+            {!!balao.alerta.comentario && <Text style={styles.calloutText}>{balao.alerta.comentario}</Text>}
+            {balao.alerta.fotoUrl && <Image source={{ uri: balao.alerta.fotoUrl }} style={styles.calloutImage} />}
+            <Text style={styles.calloutDate}>Publicado em {new Date(balao.alerta.createdAtMillis || Date.now()).toLocaleString('pt-BR')}</Text>
+            <Text style={styles.calloutDetails}>Toque para ver todos os detalhes</Text>
+          </TouchableOpacity>
+          <View style={styles.balaoSeta} />
         </View>
       )}
 
@@ -792,12 +866,13 @@ export default function MapScreen() {
             <Text style={styles.shareAlertSubtitle}>{alertaSelecionado.bairro || alertaSelecionado.gravidade}</Text>
           </View>
           <TouchableOpacity style={styles.mapWhatsAppButton} onPress={() => compartilharAlertaWhatsApp(alertaSelecionado)}><Text style={styles.mapWhatsAppText}><Icone nome="whatsapp" size={14} /> WhatsApp</Text></TouchableOpacity>
-          <TouchableOpacity style={styles.shareAlertClose} onPress={() => setAlertaSelecionado(null)}><Icone nome="fechar" size={16} color={cores.textMuted} escalavel={false} /></TouchableOpacity>
+          <TouchableOpacity style={styles.shareAlertClose} onPress={fecharBalao}><Icone nome="fechar" size={16} color={cores.textMuted} escalavel={false} /></TouchableOpacity>
         </View>
       )}
 
       <TouchableOpacity style={styles.locationButton} accessibilityLabel="Centralizar na minha localização" onPress={() => {
         if(localizacao) {
+          fecharBalao();
           cameraRef.current?.setCamera({ centerCoordinate: [localizacao.longitude, localizacao.latitude], zoomLevel: 14, animationDuration: 700 });
         }
       }}>

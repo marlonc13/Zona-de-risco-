@@ -1,7 +1,7 @@
-import { TouchableOpacity, Alert, ScrollView } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { TouchableOpacity, Alert } from 'react-native';
 import { Text, TextInput } from '../components/texto';
 import Icone from '../components/icone';
+import ScreenWrapper from '../components/screen-wrapper';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
 import * as Location from 'expo-location';
@@ -14,7 +14,6 @@ const db = getFirestore(app);
 export default function Endereco() {
   const router = useRouter();
   const styles = useEstilos(estilos);
-  const insets = useSafeAreaInsets();
   const { cores } = useTema();
   const [endereco, setEndereco] = useState('');
   const [numero, setNumero] = useState('');
@@ -73,7 +72,8 @@ export default function Endereco() {
   };
 
   return (
-    <ScrollView contentContainerStyle={[styles.container, { paddingBottom: 26 + insets.bottom }]}>
+    // ScreenWrapper: o app é edge-to-edge, a janela não encolhe com o teclado e ele cobria Cidade e Estado
+    <ScreenWrapper scrollable includeTop={false} backgroundColor={cores.screen} style={styles.container}>
       <Text style={styles.title}>Minha residência</Text>
       <Text style={styles.subtitle}>Cadastre ou altere o endereço da sua casa.</Text>
       <TouchableOpacity style={styles.locationButton} onPress={usarLocalizacao}><Text style={styles.locationText}><Icone nome="localizacao" size={15} /> Usar minha localização atual</Text></TouchableOpacity>
@@ -83,7 +83,7 @@ export default function Endereco() {
       <TextInput style={styles.input} placeholder="Cidade" placeholderTextColor={cores.placeholder} value={cidade} onChangeText={setCidade} />
       <TextInput style={styles.input} placeholder="Estado" placeholderTextColor={cores.placeholder} value={estado} onChangeText={setEstado} />
       <TouchableOpacity style={styles.save} onPress={salvar} disabled={salvando}><Text style={styles.saveText}>{salvando ? 'Salvando...' : 'Salvar endereço'}</Text></TouchableOpacity>
-    </ScrollView>
+    </ScreenWrapper>
   );
 }
 

@@ -57,7 +57,10 @@ export default criarEstilos((c, tema) => {
     // a tela da aba termina acima da tab bar: as distâncias contam a partir dela
     locationButton: { position: 'absolute', right: 18, bottom: 24, width: 58, height: 58, borderRadius: 29, backgroundColor: c.surface, alignItems: 'center', justifyContent: 'center', elevation: 8},
     addButton: { position: 'absolute', right: 18, bottom: 96, width: 58, height: 58, borderRadius: 29, backgroundColor: c.button, alignItems: 'center', justifyContent: 'center', elevation: 7 },
-    callout: { width: 230, backgroundColor: c.surface, borderRadius: 14, padding: 12 },
+    callout: { width: '100%', maxWidth: 330, backgroundColor: c.surface, borderRadius: 14, padding: 12, elevation: 10 },
+    // balão do alerta tocado: fora do mapa, centralizado, com a seta apontando para o marcador
+    balaoAlerta: { position: 'absolute', left: 14, right: 14, alignItems: 'center' },
+    balaoSeta: { width: 16, height: 16, backgroundColor: c.surface, transform: [{ rotate: '45deg' }], marginTop: -9, elevation: 9 },
     calloutTitle: { fontSize: 16, fontWeight: 'bold', color: c.textStrong, marginBottom: 4 },
     severityText: { fontSize: 12, fontWeight: '800', marginBottom: 6 },
     officialBadge: { alignSelf: 'flex-start', color: c.success, backgroundColor: c.successBackground, fontSize: 10, fontWeight: '900', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 8, marginBottom: 6 },
@@ -70,14 +73,15 @@ export default criarEstilos((c, tema) => {
     guidanceText: { fontSize: 12, color: c.textMuted, lineHeight: 17, marginTop: 2, marginBottom: 6 },
     // avisos empilhados logo abaixo dos filtros (o top é calculado na tela)
     avisosTopo: { position: 'absolute', left: 14, right: 14, gap: 8 },
-    homeWarning: { backgroundColor: c.warningBackground, borderColor: '#e8710a', borderWidth: 1, borderRadius: 14, padding: 11, elevation: 5 },
+    homeWarning: { backgroundColor: c.warningBackground, borderColor: '#e8710a', borderWidth: 1, borderRadius: 14, paddingVertical: 8, paddingHorizontal: 11, elevation: 5 },
     homeWarningText: { color: c.warning, fontWeight: '800', textAlign: 'center' },
     familyWarning: { backgroundColor: l.familiaFundo, borderColor: l.familiaBorda, borderWidth: 1, borderRadius: 14, padding: 11, elevation: 5 },
     familyWarningText: { color: l.familiaTexto, fontWeight: '800', textAlign: 'center' },
-    emergencyBanner: { backgroundColor: c.dangerButton, borderRadius: 14, padding: 12, elevation: 8 },
+    emergencyBanner: { backgroundColor: c.dangerButton, borderRadius: 14, paddingVertical: 8, paddingHorizontal: 12, elevation: 8 },
     emergencyBannerTitle: { color: c.onButton, fontWeight: '900', textAlign: 'center', fontSize: 14 },
-    emergencyBannerText: { color: c.onButton, textAlign: 'center', fontSize: 12, marginTop: 3 },
-    weatherBox: { position: 'absolute', left: 14, bottom: 42, backgroundColor: l.painel, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 9, elevation: 6, maxWidth: 230 },
+    emergencyBannerText: { color: c.onButton, textAlign: 'center', fontSize: 12, marginTop: 2 },
+    // mesma base e altura do botão de localização (bottom 24, 58 de altura), alinhado a ele
+    weatherBox: { position: 'absolute', left: 14, bottom: 24, minHeight: 58, justifyContent: 'center', backgroundColor: l.painel, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 6, elevation: 6, maxWidth: 230 },
     weatherTitle: { color: c.textStrong, fontWeight: '800', fontSize: 13 },
     weatherText: { color: c.textMuted, fontSize: 11, marginTop: 2 },
     weatherSource: { color: c.textFaint, fontSize: 9, marginTop: 3 },

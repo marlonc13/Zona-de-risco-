@@ -37,13 +37,16 @@ export default function TabLayout() {
           backgroundColor: cores.tabBar,
           borderTopColor: cores.border,
         },
-        // Rótulo em uma linha só: com "Letras grandes" ele encolhe se não couber na aba
+        // Rótulo em uma linha só e com o mesmo tamanho em todas as abas: encolher só o que
+        // não cabe ("Estatísticas") deixava esse rótulo menor e desalinhado dos outros.
+        // A margem negativa devolve ao rótulo o padding de 5 do botão interno da aba,
+        // que o tabBarItemStyle não alcança — "Estatísticas" precisa da largura toda
         tabBarLabel: ({ color, children }) => (
           <Text
+            escalavel={false}
             numberOfLines={1}
-            adjustsFontSizeToFit
-            minimumFontScale={0.7}
-            style={{ color, fontSize: 12, fontWeight: '600', textAlign: 'center' }}
+            maxFontSizeMultiplier={1.1}
+            style={{ color, fontSize: letraGrande ? 12.5 : 11.5, fontWeight: '600', textAlign: 'center', marginHorizontal: -5 }}
           >
             {children}
           </Text>
