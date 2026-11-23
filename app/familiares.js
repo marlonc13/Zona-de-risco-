@@ -1,7 +1,7 @@
-import { Alert, ScrollView, TouchableOpacity, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Alert, TouchableOpacity, View } from 'react-native';
 import { Text, TextInput } from '../components/texto';
 import Icone from '../components/icone';
+import ScreenWrapper from '../components/screen-wrapper';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { collection, doc, getFirestore, onSnapshot, setDoc } from 'firebase/firestore';
@@ -17,7 +17,6 @@ const CORES_MARCADOR = ['#7b1fa2', '#d93025', '#1a73e8', '#137333', '#f9ab00'];
 export default function Familiares() {
   const router = useRouter();
   const styles = useEstilos(estilos);
-  const insets = useSafeAreaInsets();
   const { cores } = useTema();
   const [nome, setNome] = useState('');
   const [busca, setBusca] = useState('');
@@ -101,7 +100,8 @@ export default function Familiares() {
   })), [enderecos, alertas]);
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: 40 + insets.bottom }]} keyboardShouldPersistTaps="handled">
+    // ScreenWrapper: o app é edge-to-edge, a janela não encolhe com o teclado e ele cobria os campos
+    <ScreenWrapper scrollable includeTop={false} backgroundColor={cores.screen} style={styles.content}>
       <Text style={styles.title}>Pessoas e locais favoritos</Text>
       <Text style={styles.subtitle}>Acompanhe alertas ativos perto de pessoas importantes. Apenas você vê esta lista.</Text>
       <View style={styles.form}>
@@ -124,7 +124,7 @@ export default function Familiares() {
         <View style={styles.colorRow}>{CORES_MARCADOR.map(corItem => <TouchableOpacity key={corItem} style={[styles.smallColorChoice, { backgroundColor: corItem }, (item.cor || CORES_MARCADOR[0]) === corItem && styles.colorChoiceActive]} onPress={() => mudarCor(item, corItem)} />)}</View>
         {item.riscos.length > 0 ? <TouchableOpacity style={styles.riskBox} onPress={() => router.push(`/ocorrencia/${item.riscos[0].id}`)}><Text style={styles.riskTitle}><Icone nome="alerta" size={15} /> {item.riscos.length} alerta(s) atingindo este local</Text><Text style={styles.riskText}>{item.riscos.map(risco => `${risco.tipo} (${risco.gravidade || 'Atenção'})`).join(', ')}</Text><Text style={styles.details}>Toque para ver os detalhes</Text></TouchableOpacity> : <Text style={styles.safe}><Icone nome="check" size={14} /> Nenhum alerta ativo próximo deste endereço.</Text>}
       </View>)}
-    </ScrollView>
+    </ScreenWrapper>
   );
 }
 
